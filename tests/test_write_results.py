@@ -28,7 +28,7 @@ class TestWriteCheckResults:
     def test_write_check_results_creates_file(self) -> None:
         """Test that write_check_results creates the expected file."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {
@@ -65,7 +65,7 @@ class TestWriteCheckResults:
     def test_write_check_results_creates_directory(self) -> None:
         """Test that write_check_results creates necessary directories."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {"summary": {}}
@@ -88,7 +88,7 @@ class TestWriteCheckResults:
     def test_write_check_results_json_formatting(self) -> None:
         """Test that JSON is written with proper formatting."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {
@@ -114,7 +114,7 @@ class TestWriteCheckResults:
     def test_write_check_results_overwrites_existing(self) -> None:
         """Test that write_check_results overwrites existing files."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
 
@@ -146,7 +146,7 @@ class TestWriteCheckResults:
     def test_write_check_results_handles_special_characters(self) -> None:
         """Test that account names with special characters are handled correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account-with-dashes"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {"summary": {}}
@@ -164,7 +164,7 @@ class TestWriteCheckResults:
 
     def test_write_check_results_raises_on_io_error(self) -> None:
         """Test that IOError is raised when file writing fails."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         account_name = "test-account"
         account_id = "111111111111"
         results_data: Dict[str, Any] = {"summary": {}}
@@ -192,7 +192,7 @@ class TestWriteCheckResults:
     def test_write_check_results_excludes_account_id_from_json(self) -> None:
         """Test that account_id is excluded from JSON when exclude_account_ids=True."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {
@@ -224,7 +224,7 @@ class TestWriteCheckResults:
     def test_write_check_results_excludes_account_id_from_filename(self) -> None:
         """Test that filename excludes account_id when exclude_account_ids=True."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {"summary": {}}
@@ -252,15 +252,15 @@ class TestGetResultsDir:
 
     def test_get_results_dir_returns_correct_path(self) -> None:
         """Test that get_results_dir returns the correct directory path."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         results_base_dir = "/path/to/results"
 
         result = get_results_dir(check_name, results_base_dir)
-        assert result == "/path/to/results/scps/deny_imds_v1_ec2"
+        assert result == "/path/to/results/scps/deny_ec2_imds_v1"
 
     def test_get_results_dir_with_trailing_slash(self) -> None:
         """Test get_results_dir handles trailing slashes."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         results_base_dir = "/path/to/results/"
 
         result = get_results_dir(check_name, results_base_dir)
@@ -282,23 +282,23 @@ class TestGetResultsPath:
 
     def test_get_results_path_returns_correct_path(self) -> None:
         """Test that get_results_path returns the correct file path."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         account_name = "test-account"
         account_id = "111111111111"
         results_base_dir = "/path/to/results"
 
         result = get_results_path(check_name, account_name, account_id, results_base_dir)
-        expected = Path("/path/to/results/scps/deny_imds_v1_ec2/test-account_111111111111.json")
+        expected = Path("/path/to/results/scps/deny_ec2_imds_v1/test-account_111111111111.json")
         assert result == expected
 
     def test_get_results_path_returns_path_object(self) -> None:
         """Test that get_results_path returns a Path object."""
-        result = get_results_path("deny_imds_v1_ec2", "account", "123", "/base")
+        result = get_results_path("deny_ec2_imds_v1", "account", "123", "/base")
         assert isinstance(result, Path)
 
     def test_get_results_path_excludes_account_id_when_flag_set(self) -> None:
         """Test that get_results_path excludes account_id from filename when exclude_account_ids=True."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         account_name = "test-account"
         account_id = "111111111111"
         results_base_dir = "/path/to/results"
@@ -310,7 +310,7 @@ class TestGetResultsPath:
             results_base_dir,
             exclude_account_ids=True,
         )
-        expected = Path("/path/to/results/scps/deny_imds_v1_ec2/test-account.json")
+        expected = Path("/path/to/results/scps/deny_ec2_imds_v1/test-account.json")
         assert result == expected
 
 
@@ -320,7 +320,7 @@ class TestResultsExist:
     def test_results_exist_returns_true_when_file_exists(self) -> None:
         """Test that results_exist returns True when file exists."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
 
@@ -340,7 +340,7 @@ class TestResultsExist:
     def test_results_exist_returns_false_when_file_missing(self) -> None:
         """Test that results_exist returns False when file doesn't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
 
@@ -348,7 +348,7 @@ class TestResultsExist:
 
     def test_results_exist_returns_false_when_directory_missing(self) -> None:
         """Test that results_exist returns False when directory doesn't exist."""
-        check_name = "deny_imds_v1_ec2"
+        check_name = "deny_ec2_imds_v1"
         account_name = "test-account"
         account_id = "111111111111"
         results_base_dir = "/nonexistent/directory"
@@ -358,7 +358,7 @@ class TestResultsExist:
     def test_results_exist_finds_file_without_account_id(self) -> None:
         """Test that results_exist finds files without account_id in filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
 
@@ -385,7 +385,7 @@ class TestResultsExist:
     def test_results_exist_backward_compatibility(self) -> None:
         """Test that results_exist finds old format files when using new format."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "deny_imds_v1_ec2"
+            check_name = "deny_ec2_imds_v1"
             account_name = "test-account"
             account_id = "111111111111"
 

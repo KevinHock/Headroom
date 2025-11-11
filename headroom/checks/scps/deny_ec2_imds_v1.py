@@ -1,19 +1,19 @@
-"""Check for EC2 instances that violate the deny_imds_v1_ec2 SCP."""
+"""Check for EC2 instances that violate the deny_ec2_imds_v1 SCP."""
 
 from typing import Any, Dict, List
 
 import boto3
 
 from ...aws.ec2 import DenyImdsV1Ec2, get_imds_v1_ec2_analysis
-from ...constants import DENY_IMDS_V1_EC2
+from ...constants import DENY_EC2_IMDS_V1
 from ..base import BaseCheck, CategorizedCheckResult
 from ..registry import register_check
 
 
-@register_check("scps", DENY_IMDS_V1_EC2)
-class DenyImdsV1Ec2Check(BaseCheck[DenyImdsV1Ec2]):
+@register_check("scps", DENY_EC2_IMDS_V1)
+class DenyEc2ImdsV1Check(BaseCheck[DenyImdsV1Ec2]):
     """
-    Check for EC2 instances that would be blocked by the deny_imds_v1_ec2 SCP.
+    Check for EC2 instances that would be blocked by the deny_ec2_imds_v1 SCP.
 
     This check identifies:
     - Instances that have IMDSv1 enabled (potential violations)

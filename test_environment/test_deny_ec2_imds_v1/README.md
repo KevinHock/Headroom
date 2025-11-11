@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This directory contains EC2 instances used for testing the `deny_imds_v1_ec2` SCP check. These resources are **intentionally separated** from the main test environment infrastructure so they can be destroyed most of the time to avoid ongoing AWS costs.
+This directory contains EC2 instances used for testing the `deny_ec2_imds_v1` SCP check. These resources are **intentionally separated** from the main test environment infrastructure so they can be destroyed most of the time to avoid ongoing AWS costs.
 
 ## Cost Considerations
 
@@ -19,14 +19,14 @@ This directory contains EC2 instances used for testing the `deny_imds_v1_ec2` SC
 - **Instance Type**: `t2.nano`
 - **IMDS Configuration**: `http_tokens = "optional"` (allows both IMDSv1 and IMDSv2)
 - **Tags**: `Name = "test-imdsv1-enabled"`
-- **Expected Behavior**: Should be flagged by the `deny_imds_v1_ec2` check as non-compliant
+- **Expected Behavior**: Should be flagged by the `deny_ec2_imds_v1` check as non-compliant
 
 ### Instance 2: IMDSv2 Only (acme-co account)
 - **Provider**: `aws.acme_co`
 - **Instance Type**: `t2.nano`
 - **IMDS Configuration**: `http_tokens = "required"` (requires IMDSv2, blocks IMDSv1)
 - **Tags**: `Name = "test-imdsv2-only"`
-- **Expected Behavior**: Should pass the `deny_imds_v1_ec2` check as compliant
+- **Expected Behavior**: Should pass the `deny_ec2_imds_v1` check as compliant
 
 ### Instance 3: IMDSv1 Enabled but Exempt (fort-knox account)
 - **Provider**: `aws.fort_knox`

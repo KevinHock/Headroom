@@ -93,7 +93,7 @@ def test_build_scp_terraform_module_single_check_100_percent_compliant() -> None
         comment="Organization Root",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = true" in result
+    assert "deny_ec2_imds_v1 = true" in result
     assert "deny_iam_user_creation = false" in result
     assert "deny_rds_unencrypted = false" in result
     assert "allowed_iam_users" not in result
@@ -129,7 +129,7 @@ def test_build_scp_terraform_module_multiple_checks_all_compliant() -> None:
         comment="Test",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = true" in result
+    assert "deny_ec2_imds_v1 = true" in result
     assert "deny_iam_user_creation = true" in result
     assert "deny_rds_unencrypted = false" in result
     assert "allowed_iam_users = []" in result
@@ -241,7 +241,7 @@ def test_build_scp_terraform_module_partial_compliance_skips_check() -> None:
         comment="Organization Root",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = false" in result
+    assert "deny_ec2_imds_v1 = false" in result
     assert "deny_iam_user_creation = false" in result
     assert "allowed_iam_users" not in result
     assert 'module "scps_root"' in result
@@ -275,7 +275,7 @@ def test_build_scp_terraform_module_mixed_compliance_includes_only_100_percent()
         comment="Organization Root",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = true" in result
+    assert "deny_ec2_imds_v1 = true" in result
     assert "deny_iam_user_creation = false" in result
     assert "allowed_iam_users" not in result
 
@@ -298,7 +298,7 @@ def test_build_scp_terraform_module_check_name_with_hyphens_converts_to_undersco
         comment="Organization Root",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = true" in result
+    assert "deny_ec2_imds_v1 = true" in result
     assert "deny_iam_user_creation = false" in result
     assert "allowed_iam_users" not in result
     assert "deny-imds-v1-ec2" not in result
@@ -504,7 +504,7 @@ def test_build_scp_terraform_module_with_rds_check_enabled() -> None:
         comment="Organization Root",
         organization_hierarchy=org
     )
-    assert "deny_imds_v1_ec2 = false" in result
+    assert "deny_ec2_imds_v1 = false" in result
     assert "deny_iam_user_creation = false" in result
     assert "deny_rds_unencrypted = true" in result
     assert "allowed_iam_users" not in result

@@ -89,7 +89,7 @@ headroom/
 │   ├── base.py             # BaseCheck abstract class
 │   ├── registry.py         # Check registration system
 │   ├── scps/
-│   │   ├── deny_imds_v1_ec2.py
+│   │   ├── deny_ec2_imds_v1.py
 │   │   ├── deny_iam_user_creation.py
 │   │   └── deny_rds_unencrypted.py
 │   └── rcps/
@@ -400,7 +400,7 @@ def register_check(check_type: str, check_name: str) -> Callable:
     Decorator to register check class.
 
     Usage:
-        @register_check("scps", "deny_imds_v1_ec2")
+        @register_check("scps", "deny_ec2_imds_v1")
         class DenyImdsV1Ec2Check(BaseCheck[DenyImdsV1Ec2]):
             ...
 
@@ -523,7 +523,7 @@ def build_summary_fields(self, check_result: CategorizedCheckResult) -> Dict[str
   "summary": {
     "account_name": "string",
     "account_id": "string",
-    "check": "deny_imds_v1_ec2",
+    "check": "deny_ec2_imds_v1",
     "total_instances": 0,
     "violations": 0,
     "exemptions": 0,
@@ -864,7 +864,7 @@ Both SCP and RCP parsers share these patterns:
 {results_dir}/{check_type}/{check_name}/*.json
 
 Examples:
-- {results_dir}/scps/deny_imds_v1_ec2/account-name_111111111111.json
+- {results_dir}/scps/deny_ec2_imds_v1/account-name_111111111111.json
 - {results_dir}/rcps/third_party_assumerole/account-name_111111111111.json
 ```
 
@@ -1241,7 +1241,7 @@ module "scps_root" {
   target_id = local.root_ou_id
 
   # EC2
-  deny_imds_v1_ec2 = true
+  deny_ec2_imds_v1 = true
 
   # IAM
   deny_iam_user_creation = true
@@ -1256,7 +1256,7 @@ module "scps_root" {
 ```hcl
 # modules/scps/variables.tf
 
-variable "deny_imds_v1_ec2" {
+variable "deny_ec2_imds_v1" {
   type = bool
 }
 
@@ -1277,7 +1277,7 @@ variable "allowed_iam_users" {
 locals {
   statements = [
     {
-      include = var.deny_imds_v1_ec2,
+      include = var.deny_ec2_imds_v1,
       statement = {
         Action = "ec2:RunInstances"
         Condition = {
@@ -1695,7 +1695,7 @@ def get_results_dir(
 ```python
 # constants.py
 
-DENY_IMDS_V1_EC2 = "deny_imds_v1_ec2"
+DENY_EC2_IMDS_V1 = "deny_ec2_imds_v1"
 DENY_IAM_USER_CREATION = "deny_iam_user_creation"
 DENY_RDS_UNENCRYPTED = "deny_rds_unencrypted"
 THIRD_PARTY_ASSUMEROLE = "third_party_assumerole"
@@ -1948,7 +1948,7 @@ test_environment/
 │   └── {account_name}_rcps.tf          # Account-level RCPs
 ├── headroom_results/                    # JSON analysis results
 │   ├── scps/
-│   │   ├── deny_imds_v1_ec2/
+│   │   ├── deny_ec2_imds_v1/
 │   │   │   └── {account_name}.json
 │   │   ├── deny_iam_user_creation/
 │   │   │   └── {account_name}.json
@@ -1957,7 +1957,7 @@ test_environment/
 │   └── rcps/
 │       └── third_party_assumerole/
 │           └── {account_name}.json
-├── test_deny_imds_v1_ec2/               # EC2 instances (expensive, separate directory)
+├── test_deny_ec2_imds_v1/               # EC2 instances (expensive, separate directory)
 │   ├── README.md                        # Cost warnings and usage
 │   ├── providers.tf                     # Cross-account providers
 │   ├── data.tf                          # AMI data sources
@@ -2303,7 +2303,7 @@ variable "target_id" {
   description = "OU ID or account ID to attach SCP"
 }
 
-variable "deny_imds_v1_ec2" {
+variable "deny_ec2_imds_v1" {
   type    = bool
   default = false
 }
@@ -2325,7 +2325,7 @@ variable "allowed_iam_users" {
 locals {
   statements = [
     {
-      include = var.deny_imds_v1_ec2,
+      include = var.deny_ec2_imds_v1,
       statement = {
         Action = "ec2:RunInstances"
         Condition = {
@@ -2490,7 +2490,7 @@ module "scps_high_value_assets_ou" {
   target_id = local.top_level_high_value_assets_ou_id
 
   # EC2
-  deny_imds_v1_ec2 = true
+  deny_ec2_imds_v1 = true
 
   # IAM
   deny_iam_user_creation = false
@@ -2510,7 +2510,7 @@ module "scps_fort_knox" {
   target_id = local.fort_knox_account_id
 
   # EC2
-  deny_imds_v1_ec2 = true
+  deny_ec2_imds_v1 = true
 
   # IAM
   deny_iam_user_creation = false
@@ -2607,7 +2607,7 @@ headroom_results/
 {
   "summary": {
     "account_name": "acme-co",
-    "check": "deny_imds_v1_ec2",
+    "check": "deny_ec2_imds_v1",
     "total_instances": 1,
     "violations": 0,
     "exemptions": 0,

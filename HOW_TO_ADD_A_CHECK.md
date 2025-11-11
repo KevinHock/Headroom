@@ -60,11 +60,17 @@ This guide walks you through adding a new compliance check to Headroom, from ini
 
 **Existing Code Familiarity:**
 - Review existing checks:
-  - `headroom/checks/scps/deny_imds_v1_ec2.py`
+  - `headroom/checks/scps/deny_ec2_imds_v1.py`
   - `headroom/checks/scps/deny_iam_user_creation.py`
   - `headroom/checks/rcps/deny_third_party_assumerole.py`
 - Understand `headroom/checks/base.py` (BaseCheck pattern)
 - Review `documentation/POLICY_TAXONOMY.md` for policy patterns
+
+**Naming Convention:**
+- All checks MUST follow the naming convention: `deny_{AWS_service}_{specific_check}`
+- AWS service name should come first (e.g., `deny_ec2_imds_v1`, `deny_rds_unencrypted`, `deny_iam_user_creation`)
+- Use lowercase with underscores (snake_case)
+- Be specific but concise about what the check detects
 
 ---
 
@@ -429,7 +435,7 @@ Add your check name to the constants module:
 
 ```python
 # Check name constants
-DENY_IMDS_V1_EC2 = "deny_imds_v1_ec2"
+DENY_EC2_IMDS_V1 = "deny_ec2_imds_v1"  # Note: deny_{service}_{check}
 DENY_IAM_USER_CREATION = "deny_iam_user_creation"
 THIRD_PARTY_ASSUMEROLE = "third_party_assumerole"
 DENY_RDS_UNENCRYPTED = "deny_rds_unencrypted"  # ADD THIS LINE
@@ -437,6 +443,8 @@ DENY_RDS_UNENCRYPTED = "deny_rds_unencrypted"  # ADD THIS LINE
 
 **Rules:**
 - Use snake_case
+- Follow the pattern: `deny_{AWS_service}_{specific_check}` (e.g., `deny_ec2_imds_v1`, `deny_rds_unencrypted`)
+- AWS service name MUST come immediately after the action verb
 - Prefix with action (deny_, enforce_, require_)
 - Be descriptive but concise
 - Match filename (minus extension)
@@ -880,8 +888,8 @@ def _build_scp_terraform_module(...):
 
     # EC2
     terraform_content += "  # EC2\n"
-    deny_imds_v1_ec2 = "deny_imds_v1_ec2" in enabled_checks
-    terraform_content += f"  deny_imds_v1_ec2 = {str(deny_imds_v1_ec2).lower()}\n"
+    deny_ec2_imds_v1 = "deny_ec2_imds_v1" in enabled_checks
+    terraform_content += f"  deny_ec2_imds_v1 = {str(deny_ec2_imds_v1).lower()}\n"
     terraform_content += "\n"
 
     # IAM
@@ -1483,7 +1491,7 @@ module "scps_acme_co" {
   target_id = local.acme_co_account_id
 
   # EC2
-  deny_imds_v1_ec2 = false
+  deny_ec2_imds_v1 = false
 
   # IAM
   deny_iam_user_creation = false

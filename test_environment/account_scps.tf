@@ -7,7 +7,7 @@ module "scps_fort_knox" {
   target_id = aws_organizations_account.fort_knox.id
 
   # EC2
-  deny_imds_v1_ec2 = true
+  deny_ec2_imds_v1 = true
 
   # IAM
   deny_iam_user_creation = false

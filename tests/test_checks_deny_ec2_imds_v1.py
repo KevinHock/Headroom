@@ -1,7 +1,7 @@
 """
-Tests for headroom.checks.scps.deny_imds_v1_ec2 module.
+Tests for headroom.checks.scps.deny_ec2_imds_v1 module.
 
-Tests for check_deny_imds_v1_ec2 function and its integration with AWS EC2 analysis.
+Tests for check_deny_ec2_imds_v1 function and its integration with AWS EC2 analysis.
 """
 
 import pytest
@@ -9,14 +9,14 @@ import tempfile
 import shutil
 from unittest.mock import MagicMock, patch
 from typing import List, Generator
-from headroom.checks.scps.deny_imds_v1_ec2 import DenyImdsV1Ec2Check
-from headroom.constants import DENY_IMDS_V1_EC2
+from headroom.checks.scps.deny_ec2_imds_v1 import DenyEc2ImdsV1Check
+from headroom.constants import DENY_EC2_IMDS_V1
 from headroom.config import DEFAULT_RESULTS_DIR
 from headroom.aws.ec2 import DenyImdsV1Ec2
 
 
-class TestCheckDenyImdsV1Ec2:
-    """Test check_deny_imds_v1_ec2 function with various scenarios."""
+class TestCheckDenyEc2ImdsV1:
+    """Test check_deny_ec2_imds_v1 function with various scenarios."""
 
     @pytest.fixture
     def temp_results_dir(self) -> Generator[str, None, None]:
@@ -73,7 +73,7 @@ class TestCheckDenyImdsV1Ec2:
             )
         ]
 
-    def test_check_deny_imds_v1_ec2_mixed_results(
+    def test_check_deny_ec2_imds_v1_mixed_results(
         self,
         sample_imds_results_mixed: List[DenyImdsV1Ec2],
         temp_results_dir: str,
@@ -84,14 +84,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "111111111111"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = sample_imds_results_mixed
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -118,7 +118,7 @@ class TestCheckDenyImdsV1Ec2:
             summary = results_data["summary"]
             assert summary["account_name"] == "test-account"
             assert summary["account_id"] == "111111111111"
-            assert summary["check"] == "deny_imds_v1_ec2"
+            assert summary["check"] == "deny_ec2_imds_v1"
             assert summary["total_instances"] == 4
             assert summary["violations"] == 2
             assert summary["exemptions"] == 1
@@ -145,7 +145,7 @@ class TestCheckDenyImdsV1Ec2:
 
             # Print output is verified indirectly through test success
 
-    def test_check_deny_imds_v1_ec2_all_compliant(
+    def test_check_deny_ec2_imds_v1_all_compliant(
         self,
         sample_imds_results_compliant: List[DenyImdsV1Ec2],
         temp_results_dir: str,
@@ -156,14 +156,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "987654321098"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = sample_imds_results_compliant
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -188,21 +188,21 @@ class TestCheckDenyImdsV1Ec2:
 
             # Print output is verified indirectly through test success
 
-    def test_check_deny_imds_v1_ec2_no_instances(self, temp_results_dir: str) -> None:
+    def test_check_deny_ec2_imds_v1_no_instances(self, temp_results_dir: str) -> None:
         """Test check function with no instances."""
         mock_session = MagicMock()
         account_name = "empty-account"
         account_id = "111111111111"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = []
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -226,7 +226,7 @@ class TestCheckDenyImdsV1Ec2:
             assert len(results_data["exemptions"]) == 0
             assert len(results_data["compliant_instances"]) == 0
 
-    def test_check_deny_imds_v1_ec2_all_violations(self, temp_results_dir: str) -> None:
+    def test_check_deny_ec2_imds_v1_all_violations(self, temp_results_dir: str) -> None:
         """Test check function with all violations (worst case)."""
         violation_results = [
             DenyImdsV1Ec2(
@@ -248,14 +248,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "222222222222"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = violation_results
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -274,7 +274,7 @@ class TestCheckDenyImdsV1Ec2:
             assert summary["compliant"] == 0
             assert summary["compliance_percentage"] == 0.0  # 0% compliance
 
-    def test_check_deny_imds_v1_ec2_all_exemptions(self, temp_results_dir: str) -> None:
+    def test_check_deny_ec2_imds_v1_all_exemptions(self, temp_results_dir: str) -> None:
         """Test check function with all exemptions."""
         exemption_results = [
             DenyImdsV1Ec2(
@@ -296,14 +296,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "333333333333"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = exemption_results
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -322,7 +322,7 @@ class TestCheckDenyImdsV1Ec2:
             assert summary["compliant"] == 0
             assert summary["compliance_percentage"] == 100.0  # 100% with exemptions
 
-    def test_check_deny_imds_v1_ec2_json_formatting(
+    def test_check_deny_ec2_imds_v1_json_formatting(
         self,
         sample_imds_results_mixed: List[DenyImdsV1Ec2],
         temp_results_dir: str
@@ -333,14 +333,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "444444444444"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = sample_imds_results_mixed
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=temp_results_dir,
@@ -351,7 +351,7 @@ class TestCheckDenyImdsV1Ec2:
             mock_write.assert_called_once()
             # JSON formatting is now handled by write_check_results module
 
-    def test_check_deny_imds_v1_ec2_directory_creation(
+    def test_check_deny_ec2_imds_v1_directory_creation(
         self,
         sample_imds_results_mixed: List[DenyImdsV1Ec2],
         temp_results_dir: str,
@@ -362,14 +362,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "555555555555"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = sample_imds_results_mixed
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,
@@ -379,7 +379,7 @@ class TestCheckDenyImdsV1Ec2:
             # Verify write_check_results was called (directory creation is handled there)
             mock_write.assert_called_once()
 
-    def test_check_deny_imds_v1_ec2_result_data_structure(
+    def test_check_deny_ec2_imds_v1_result_data_structure(
         self,
         sample_imds_results_mixed: List[DenyImdsV1Ec2],
         temp_results_dir: str,
@@ -390,14 +390,14 @@ class TestCheckDenyImdsV1Ec2:
         account_id = "666666666666"
 
         with (
-            patch("headroom.checks.scps.deny_imds_v1_ec2.get_imds_v1_ec2_analysis") as mock_analysis,
+            patch("headroom.checks.scps.deny_ec2_imds_v1.get_imds_v1_ec2_analysis") as mock_analysis,
             patch("headroom.checks.base.write_check_results") as mock_write,
             patch("builtins.print")
         ):
             mock_analysis.return_value = sample_imds_results_mixed
 
-            check = DenyImdsV1Ec2Check(
-                check_name=DENY_IMDS_V1_EC2,
+            check = DenyEc2ImdsV1Check(
+                check_name=DENY_EC2_IMDS_V1,
                 account_name=account_name,
                 account_id=account_id,
                 results_dir=DEFAULT_RESULTS_DIR,

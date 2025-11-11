@@ -14357,3 +14357,63 @@ These lessons document critical pitfalls discovered during implementation:
 
 Future check implementations can reference these lessons to avoid repeating mistakes.
 
+
+## 2025-11-11 01:49 AM - Renamed deny_imds_v1_ec2 to deny_ec2_imds_v1
+
+**Objective:** Standardize check naming convention to follow the pattern `deny_{AWS_service}_{specific_check}`
+
+**Naming Convention Established:**
+- All checks MUST follow: `deny_{AWS_service}_{specific_check}`
+- AWS service name comes first (e.g., `deny_ec2_imds_v1`, `deny_rds_unencrypted`, `deny_iam_user_creation`)
+- Documented in HOW_TO_ADD_A_CHECK.md with examples and guidance
+
+**Files Renamed:**
+- `headroom/checks/scps/deny_imds_v1_ec2.py` → `deny_ec2_imds_v1.py`
+- `tests/test_checks_deny_imds_v1_ec2.py` → `test_checks_deny_ec2_imds_v1.py`
+- `test_environment/test_deny_imds_v1_ec2/` → `test_deny_ec2_imds_v1/`
+- `test_environment/headroom_results/scps/deny_imds_v1_ec2/` → `deny_ec2_imds_v1/`
+
+**Files Modified:**
+- `headroom/constants.py` - Updated constant: `DENY_IMDS_V1_EC2` → `DENY_EC2_IMDS_V1`
+- `headroom/checks/scps/deny_ec2_imds_v1.py` - Updated class name: `DenyImdsV1Ec2Check` → `DenyEc2ImdsV1Check`
+- `headroom/terraform/generate_scps.py` - Updated variable name in terraform generation
+- `test_environment/modules/scps/variables.tf` - Updated variable: `deny_imds_v1_ec2` → `deny_ec2_imds_v1`
+- `test_environment/modules/scps/locals.tf` - Updated policy variable references
+- `test_environment/account_scps.tf` - Updated module call parameter
+- `test_environment/scps/*.tf` - Updated all generated terraform files
+- `test_environment/test_deny_ec2_imds_v1/README.md` - Updated check name references
+- `test_environment/test_deny_ec2_imds_v1/ec2_instances.tf` - Updated comment
+- All test files updated with new check name and class name
+- All documentation files updated (README.md, Headroom-Specification.md, POLICY_TAXONOMY.md, mermaid diagrams)
+
+**Test Updates:**
+- `tests/test_checks_deny_ec2_imds_v1.py` - Updated all function names, class references, and assertions
+- `tests/test_checks_registry.py` - Updated check name assertions
+- `tests/test_analysis_extended.py` - Updated mock patch paths
+- `tests/test_generate_scps.py` - Updated terraform generation assertions
+- `tests/test_write_results.py` - Updated check name in test data
+- `tests/test_parse_results.py` - Updated check name in all test scenarios
+
+**Documentation Updates:**
+- `HOW_TO_ADD_A_CHECK.md` - Added naming convention guidance with examples
+- `README.md` - Updated all references to check name and file paths
+- `Headroom-Specification.md` - Updated all code examples and directory structures
+- `documentation/POLICY_TAXONOMY.md` - Updated pattern example name
+- `documentation/mermaid_diagrams/sequences.md` - Updated diagram example
+- `documentation/mermaid_diagrams/module_dependency.md` - Updated module references
+
+**Rationale:**
+The original name `deny_imds_v1_ec2` placed the EC2 service at the end, which was inconsistent with other checks like `deny_iam_user_creation` and `deny_rds_unencrypted`. The new name `deny_ec2_imds_v1` follows the established pattern where the AWS service name comes immediately after the action verb, making it easier to:
+- Find all checks for a specific AWS service
+- Understand at a glance which service each check relates to
+- Maintain consistency across the growing check library
+
+**Impact:**
+- All 271 occurrences of the old name updated throughout the codebase
+- All functionality preserved with new naming
+- Documentation comprehensively updated
+- Naming convention now formally documented for future checks
+- 29 files changed: 117 insertions(+), 946 deletions(-)
+
+**Git Summary:**
+29 files changed with renames, updates to all imports, references, tests, and documentation. The check is now consistently named `deny_ec2_imds_v1` throughout the entire codebase.

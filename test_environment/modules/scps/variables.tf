@@ -16,7 +16,7 @@ variable "target_id" {
 
 # EC2
 
-variable "deny_imds_v1_ec2" {
+variable "deny_ec2_imds_v1" {
   type = bool
 }
 

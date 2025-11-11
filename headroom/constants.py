@@ -10,7 +10,7 @@ from typing import Dict
 
 # SCP Checks (alphabetical by service)
 # EC2
-DENY_IMDS_V1_EC2 = "deny_imds_v1_ec2"
+DENY_EC2_IMDS_V1 = "deny_ec2_imds_v1"
 # IAM
 DENY_IAM_USER_CREATION = "deny_iam_user_creation"
 # RDS

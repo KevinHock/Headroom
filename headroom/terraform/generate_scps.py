@@ -79,8 +79,8 @@ module "{module_name}" {{
 
     # EC2
     terraform_content += "  # EC2\n"
-    deny_imds_v1_ec2 = "deny_imds_v1_ec2" in enabled_checks
-    terraform_content += f"  deny_imds_v1_ec2 = {str(deny_imds_v1_ec2).lower()}\n"
+    deny_ec2_imds_v1 = "deny_ec2_imds_v1" in enabled_checks
+    terraform_content += f"  deny_ec2_imds_v1 = {str(deny_ec2_imds_v1).lower()}\n"
     terraform_content += "\n"
 
     # IAM
