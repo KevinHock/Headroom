@@ -109,7 +109,7 @@ Compliance: 100.0%
 Reasoning: All accounts in organization have zero violations - safe to deploy at root level
 ----------------------------------------
 
-Check: third_party_assumerole
+Check: deny_sts_third_party_assumerole
 Recommended Level: OU
 Affected Target: Acme Acquisition OU (ou-xxxx-xxxxxxxx)
 Affected Accounts: 2
@@ -159,9 +159,9 @@ module "rcps_acme_acquisition_ou" {
   source = "../modules/rcps"
   target_id = local.top_level_acme_acquisition_ou_id
 
-  # third_party_assumerole
+  # deny_sts_third_party_assumerole
   enforce_assume_role_org_identities = true
-  third_party_assumerole_account_ids_allowlist = [
+  deny_sts_third_party_assumerole_account_ids_allowlist = [
     "111111111111",
     "222222222222",
   ]
@@ -306,7 +306,7 @@ The tool generates:
 - **JSON Results**:
   - SCPs: `test_environment/headroom_results/scps/deny_ec2_imds_v1/{account_name}_{account_id}.json`
   - SCPs: `test_environment/headroom_results/scps/deny_iam_user_creation/{account_name}_{account_id}.json`
-  - RCPs: `test_environment/headroom_results/rcps/third_party_assumerole/{account_name}_{account_id}.json`
+  - RCPs: `test_environment/headroom_results/rcps/deny_sts_third_party_assumerole/{account_name}_{account_id}.json`
 - **Organization Data**:
   - `test_environment/scps/grab_org_info.tf`
   - `test_environment/rcps/grab_org_info.tf`
@@ -332,7 +332,7 @@ headroom/
 │   │   ├── deny_ec2_imds_v1.py  # EC2 IMDS v1 check
 │   │   └── deny_iam_user_creation.py  # IAM user creation check
 │   └── rcps/      # Resource Control Policy checks
-│       └── check_third_party_assumerole.py  # Third-party access check
+│       └── deny_sts_third_party_assumerole.py  # Third-party access check
 ├── terraform/     # Terraform generation
 │   ├── generate_org_info.py  # Organization data sources
 │   ├── generate_scps.py      # SCP configurations
@@ -375,7 +375,7 @@ headroom/
 ### RCP Checks
 
 #### Third-Party AssumeRole Analysis
-- **Check Name**: `third_party_assumerole`
+- **Check Name**: `deny_sts_third_party_assumerole`
 - **Purpose**: Identifies IAM roles with trust policies allowing external account access
 - **Detection**: Identifies third-party account IDs and wildcard principals
 - **Output**: Detailed role trust policy analysis with third-party account lists

@@ -228,7 +228,7 @@ class TestRunChecks:
             patch("headroom.checks.scps.deny_ec2_imds_v1.DenyEc2ImdsV1Check.execute") as mock_scp_execute,
             patch("headroom.checks.scps.deny_iam_user_creation.DenyIamUserCreationCheck.execute"),
             patch("headroom.checks.scps.deny_rds_unencrypted.DenyRdsUnencryptedCheck.execute"),
-            patch("headroom.checks.rcps.deny_third_party_assumerole.ThirdPartyAssumeRoleCheck.execute"),
+            patch("headroom.checks.rcps.deny_sts_third_party_assumerole.DenyStsThirdPartyAssumeRoleCheck.execute"),
             patch("headroom.analysis.logger") as mock_logger,
             patch("headroom.analysis.results_exist", return_value=False)
         ):
@@ -274,7 +274,7 @@ class TestRunChecks:
             patch("headroom.checks.scps.deny_ec2_imds_v1.DenyEc2ImdsV1Check.execute") as mock_check,
             patch("headroom.checks.scps.deny_iam_user_creation.DenyIamUserCreationCheck.execute"),
             patch("headroom.checks.scps.deny_rds_unencrypted.DenyRdsUnencryptedCheck.execute"),
-            patch("headroom.checks.rcps.deny_third_party_assumerole.ThirdPartyAssumeRoleCheck.execute"),
+            patch("headroom.checks.rcps.deny_sts_third_party_assumerole.DenyStsThirdPartyAssumeRoleCheck.execute"),
             patch("headroom.analysis.results_exist", return_value=False)
         ):
             mock_headroom_session = MagicMock()
@@ -301,7 +301,7 @@ class TestRunChecks:
             patch("headroom.checks.scps.deny_ec2_imds_v1.DenyEc2ImdsV1Check.execute"),
             patch("headroom.checks.scps.deny_iam_user_creation.DenyIamUserCreationCheck.execute"),
             patch("headroom.checks.scps.deny_rds_unencrypted.DenyRdsUnencryptedCheck.execute"),
-            patch("headroom.checks.rcps.deny_third_party_assumerole.ThirdPartyAssumeRoleCheck.execute"),
+            patch("headroom.checks.rcps.deny_sts_third_party_assumerole.DenyStsThirdPartyAssumeRoleCheck.execute"),
             patch("headroom.analysis.results_exist", return_value=False),
             pytest.raises(RuntimeError, match="Failed to assume Headroom role")
         ):
@@ -324,7 +324,7 @@ class TestRunChecks:
             patch("headroom.checks.scps.deny_ec2_imds_v1.DenyEc2ImdsV1Check.execute") as mock_check,
             patch("headroom.checks.scps.deny_iam_user_creation.DenyIamUserCreationCheck.execute") as mock_check2,
             patch("headroom.checks.scps.deny_rds_unencrypted.DenyRdsUnencryptedCheck.execute") as mock_check3,
-            patch("headroom.checks.rcps.deny_third_party_assumerole.ThirdPartyAssumeRoleCheck.execute"),
+            patch("headroom.checks.rcps.deny_sts_third_party_assumerole.DenyStsThirdPartyAssumeRoleCheck.execute"),
             patch("headroom.analysis.logger") as mock_logger,
             patch("headroom.analysis.results_exist") as mock_check_results
         ):

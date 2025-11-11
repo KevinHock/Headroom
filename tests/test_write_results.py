@@ -528,7 +528,7 @@ class TestRedactAccountIdsFromArns:
     def test_write_check_results_redacts_arns_when_exclude_account_ids(self) -> None:
         """Test that ARNs are redacted when exclude_account_ids=True."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "third_party_assumerole"
+            check_name = "deny_sts_third_party_assumerole"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {
@@ -566,7 +566,7 @@ class TestRedactAccountIdsFromArns:
     def test_write_check_results_preserves_arns_when_exclude_account_ids_false(self) -> None:
         """Test that ARNs are NOT redacted when exclude_account_ids=False."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            check_name = "third_party_assumerole"
+            check_name = "deny_sts_third_party_assumerole"
             account_name = "test-account"
             account_id = "111111111111"
             results_data: Dict[str, Any] = {

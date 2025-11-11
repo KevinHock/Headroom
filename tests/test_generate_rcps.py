@@ -80,7 +80,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test parsing results from a single account."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         result_data = {
@@ -109,7 +109,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test parsing results from multiple accounts."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         result_data_1 = {
@@ -152,7 +152,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test parsing empty directory."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         result = parse_rcp_result_files(temp_results_dir, sample_org_hierarchy)
@@ -165,7 +165,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test parsing with invalid JSON file."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         # Create invalid JSON file
@@ -183,7 +183,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test parsing with file missing required summary key."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         # Create file with missing summary key - should fail with RuntimeError
@@ -204,7 +204,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test that accounts with wildcard principals are skipped."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         # Account with wildcard - should be skipped
@@ -249,7 +249,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test that missing account_id is looked up from account_name."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         # Result without account_id (e.g., from exclude_account_ids=True)
@@ -278,7 +278,7 @@ class TestParseRcpResultFiles:
         sample_org_hierarchy: OrganizationHierarchy
     ) -> None:
         """Test that an error is raised when account_name is not in org hierarchy."""
-        check_dir = Path(temp_results_dir) / "rcps" / "third_party_assumerole"
+        check_dir = Path(temp_results_dir) / "rcps" / "deny_sts_third_party_assumerole"
         check_dir.mkdir(parents=True)
 
         # Result with unknown account name
@@ -631,7 +631,7 @@ class TestCreateRootLevelRcpRecommendation:
             sample_org_hierarchy
         )
 
-        assert recommendation.check_name == "third_party_assumerole"
+        assert recommendation.check_name == "deny_sts_third_party_assumerole"
         assert recommendation.recommended_level == "root"
         assert recommendation.target_ou_id is None
         assert set(recommendation.affected_accounts) == {"111111111111", "222222222222"}
@@ -1077,7 +1077,7 @@ class TestCreateAccountLevelRcpRecommendations:
 
         assert len(recommendations) == 1
         rec = recommendations[0]
-        assert rec.check_name == "third_party_assumerole"
+        assert rec.check_name == "deny_sts_third_party_assumerole"
         assert rec.recommended_level == "account"
         assert rec.target_ou_id is None
         assert rec.affected_accounts == ["111111111111"]
@@ -1232,7 +1232,7 @@ class TestGenerateRcpTerraform:
         """Test generating root level RCP Terraform."""
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="root",
                 target_ou_id=None,
                 affected_accounts=["111111111111"],
@@ -1261,7 +1261,7 @@ class TestGenerateRcpTerraform:
         """Test generating OU level RCP Terraform."""
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="ou",
                 target_ou_id="ou-1111",
                 affected_accounts=["111111111111"],
@@ -1289,7 +1289,7 @@ class TestGenerateRcpTerraform:
         """Test generating account level RCP Terraform."""
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="account",
                 target_ou_id=None,
                 affected_accounts=["111111111111"],
@@ -1317,7 +1317,7 @@ class TestGenerateRcpTerraform:
         """Test that missing OU in hierarchy raises exception."""
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="ou",
                 target_ou_id="ou-9999",
                 affected_accounts=["111111111111"],
@@ -1338,7 +1338,7 @@ class TestGenerateRcpTerraform:
         """Test that missing account in hierarchy raises exception."""
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="account",
                 target_ou_id=None,
                 affected_accounts=["999999999999"],
@@ -1374,11 +1374,11 @@ class TestGenerateRcpTerraform:
 
         When a wildcard is present, it means trusting all account IDs which could cause
         outages if the RCP is deployed, so enforcement should be disabled.
-        The third_party_assumerole_account_ids_allowlist parameter should not be passed when enforcement is false.
+        The deny_sts_third_party_assumerole_account_ids_allowlist parameter should not be passed when enforcement is false.
         """
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="root",
                 target_ou_id=None,
                 affected_accounts=["111111111111"],
@@ -1394,7 +1394,7 @@ class TestGenerateRcpTerraform:
 
         content = root_file.read_text()
         assert "enforce_assume_role_org_identities = false" in content
-        assert "third_party_assumerole_account_ids_allowlist" not in content
+        assert "deny_sts_third_party_assumerole_account_ids_allowlist" not in content
 
     def test_no_symlink_created_by_generate_rcp_terraform(
         self,
@@ -1409,7 +1409,7 @@ class TestGenerateRcpTerraform:
         """
         recommendations = [
             RCPPlacementRecommendations(
-                check_name="third_party_assumerole",
+                check_name="deny_sts_third_party_assumerole",
                 recommended_level="account",
                 target_ou_id=None,
                 affected_accounts=["111111111111"],
@@ -1516,7 +1516,7 @@ class TestBuildRcpTerraformModule:
 
         assert 'module "rcps_test_account"' in result
         assert "target_id = local.test_account_account_id" in result
-        assert "third_party_assumerole_account_ids_allowlist" in result
+        assert "deny_sts_third_party_assumerole_account_ids_allowlist" in result
         assert '"111111111111"' in result
         assert '"222222222222"' in result
         assert "enforce_assume_role_org_identities = true" in result

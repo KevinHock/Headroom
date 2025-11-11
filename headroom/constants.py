@@ -17,8 +17,8 @@ DENY_IAM_USER_CREATION = "deny_iam_user_creation"
 DENY_RDS_UNENCRYPTED = "deny_rds_unencrypted"
 
 # RCP Checks (alphabetical by service)
-# IAM
-THIRD_PARTY_ASSUMEROLE = "third_party_assumerole"
+# STS
+DENY_STS_THIRD_PARTY_ASSUMEROLE = "deny_sts_third_party_assumerole"
 
 # Terraform file generation constants
 ORG_INFO_FILENAME = "grab_org_info.tf"

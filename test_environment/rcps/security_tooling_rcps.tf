@@ -5,7 +5,7 @@ module "rcps_security_tooling" {
   source = "../modules/rcps"
   target_id = local.security_tooling_account_id
 
-  third_party_assumerole_account_ids_allowlist = [
+  deny_sts_third_party_assumerole_account_ids_allowlist = [
   ]
   enforce_assume_role_org_identities = true
 }

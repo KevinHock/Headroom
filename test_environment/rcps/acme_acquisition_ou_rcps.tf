@@ -5,7 +5,7 @@ module "rcps_acme_acquisition_ou" {
   source = "../modules/rcps"
   target_id = local.top_level_acme_acquisition_ou_id
 
-  third_party_assumerole_account_ids_allowlist = [
+  deny_sts_third_party_assumerole_account_ids_allowlist = [
     "749430749651",
   ]
   enforce_assume_role_org_identities = true

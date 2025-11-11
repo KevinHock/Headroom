@@ -14417,3 +14417,63 @@ The original name `deny_imds_v1_ec2` placed the EC2 service at the end, which wa
 
 **Git Summary:**
 29 files changed with renames, updates to all imports, references, tests, and documentation. The check is now consistently named `deny_ec2_imds_v1` throughout the entire codebase.
+
+## 2025-11-11 01:52 AM - Renamed third_party_assumerole to deny_sts_third_party_assumerole
+
+**Objective:** Standardize RCP check naming convention to follow the same pattern as SCP checks: `deny_{AWS_service}_{specific_check}`
+
+**Naming Convention Applied:**
+- RCP checks now follow: `deny_{AWS_service}_{specific_check}`
+- AWS service name (STS) comes immediately after the action verb
+- Consistent with SCP naming: `deny_ec2_imds_v1`, `deny_rds_unencrypted`, `deny_iam_user_creation`
+
+**Files Renamed:**
+- `headroom/checks/rcps/deny_third_party_assumerole.py` → `deny_sts_third_party_assumerole.py`
+- `tests/test_checks_deny_third_party_assumerole.py` → `test_checks_deny_sts_third_party_assumerole.py`
+- `test_environment/test_deny_third_party_assumerole.tf` → `test_deny_sts_third_party_assumerole.tf`
+- `test_environment/headroom_results/rcps/third_party_assumerole/` → `deny_sts_third_party_assumerole/`
+
+**Files Modified:**
+- `headroom/constants.py` - Updated constant: `THIRD_PARTY_ASSUMEROLE` → `DENY_STS_THIRD_PARTY_ASSUMEROLE`
+- `headroom/checks/rcps/deny_sts_third_party_assumerole.py` - Updated class name: `ThirdPartyAssumeRoleCheck` → `DenyStsThirdPartyAssumeRoleCheck`
+- `headroom/terraform/generate_rcps.py` - Updated constant import and variable name in terraform generation
+- `test_environment/modules/rcps/variables.tf` - Updated variable: `third_party_assumerole_account_ids_allowlist` → `deny_sts_third_party_assumerole_account_ids_allowlist`
+- `test_environment/modules/rcps/locals.tf` - Updated policy variable references
+- `test_environment/modules/rcps/README.md` - Updated variable documentation
+- `test_environment/rcps/*.tf` - Updated all generated terraform files
+- All test files updated with new check name and class name
+- All documentation files updated (README.md, Headroom-Specification.md, POLICY_TAXONOMY.md, mermaid diagrams, HOW_TO_ADD_A_CHECK.md)
+
+**Test Updates:**
+- `tests/test_checks_deny_sts_third_party_assumerole.py` - Updated all function names, class references, and assertions
+- `tests/test_checks_registry.py` - Updated check name assertions
+- `tests/test_analysis_extended.py` - Updated mock patch paths
+- `tests/test_generate_rcps.py` - Updated terraform generation assertions and directory paths
+- `tests/test_write_results.py` - Updated check name in test data
+- `tests/test_parse_results.py` - Updated check name in test scenarios
+
+**Documentation Updates:**
+- `HOW_TO_ADD_A_CHECK.md` - Updated example check name
+- `README.md` - Updated all references to check name, file paths, and variable names
+- `Headroom-Specification.md` - Updated all code examples, directory structures, and variable names
+- `documentation/POLICY_TAXONOMY.md` - Updated pattern example with new check name and variable name
+- `documentation/mermaid_diagrams/sequences.md` - Updated diagram examples
+- `documentation/mermaid_diagrams/module_dependency.md` - Updated module references
+
+**Rationale:**
+The original name `third_party_assumerole` did not include the AWS service name, which was inconsistent with the newly established naming convention. The check relates to STS (AWS Security Token Service) AssumeRole operations, so the new name `deny_sts_third_party_assumerole` makes it clear that:
+- This is an STS-related check
+- It denies third-party assume role access
+- It follows the same pattern as all other checks
+
+This makes the check library more organized and easier to navigate as it grows.
+
+**Impact:**
+- All 257 occurrences of the old name updated throughout the codebase
+- Variable name updated from `third_party_assumerole_account_ids_allowlist` to `deny_sts_third_party_assumerole_account_ids_allowlist` throughout Terraform modules
+- All functionality preserved with new naming
+- Documentation comprehensively updated
+- 25 files changed: 81 insertions(+), 1,107 deletions(-)
+
+**Git Summary:**
+25 files changed with renames, updates to all imports, references, tests, terraform variables, and documentation. The check is now consistently named `deny_sts_third_party_assumerole` throughout the entire codebase, with the long Terraform variable name `deny_sts_third_party_assumerole_account_ids_allowlist` for the allowlist.

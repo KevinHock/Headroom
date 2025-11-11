@@ -10,13 +10,13 @@ from typing import Any, Dict, List, Set
 import boto3
 
 from ...aws.iam.roles import TrustPolicyAnalysis, analyze_iam_roles_trust_policies
-from ...constants import THIRD_PARTY_ASSUMEROLE
+from ...constants import DENY_STS_THIRD_PARTY_ASSUMEROLE
 from ..base import BaseCheck, CategorizedCheckResult
 from ..registry import register_check
 
 
-@register_check("rcps", THIRD_PARTY_ASSUMEROLE)
-class ThirdPartyAssumeRoleCheck(BaseCheck[TrustPolicyAnalysis]):
+@register_check("rcps", DENY_STS_THIRD_PARTY_ASSUMEROLE)
+class DenyStsThirdPartyAssumeRoleCheck(BaseCheck[TrustPolicyAnalysis]):
     """
     Check for IAM roles that allow third-party account AssumeRole access.
 
