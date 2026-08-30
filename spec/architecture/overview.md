@@ -91,15 +91,14 @@ Two boundaries worth stating outright:
 
 ## Where a change lands
 
-`spec/README.md` carries the full routing table. The short version:
+Routing from a touched path to the documents that govern it lives in
+[`../../CLAUDE.md`](../../CLAUDE.md#routes), which also names the implementation
+files and tests the same change must open.
 
-| Changing | Read |
-|---|---|
-| What a check decides | that check's document, and [`check-framework.md`](check-framework.md) |
-| How a policy document is read | [`../contracts/policy-model.md`](../contracts/policy-model.md), and every RCP check |
-| What is written or read back | [`../contracts/results.md`](../contracts/results.md) |
-| Where a policy attaches | [`../contracts/placement.md`](../contracts/placement.md) |
-| What lands in the output directory | [`../contracts/terraform.md`](../contracts/terraform.md) |
+A shorter version keyed by intent rather than by path used to sit here. It was a
+second copy, and it drifted: it survived the move of the real table and went on
+naming a location that no longer held one. One table that stays right beats two
+that disagree, which is the same rule the corpus applies to behavior.
 
 ## Diagrams
 

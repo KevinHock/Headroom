@@ -234,8 +234,10 @@ module "scps_root" {
 ## Documentation
 
 The specification corpus in **[`spec/`](spec/README.md)** is the authority on
-intended behavior. Start at its manifest, which carries the authority model and a
-routing table from any file you are touching to the specifications that govern it.
+intended behavior. Start at its manifest, which carries the authority model, the
+precedence chain, and which document owns which topic. Routing from a file you
+are touching to the specifications that govern it is in
+[`CLAUDE.md`](CLAUDE.md#routes).
 
 - **[Specification manifest](spec/README.md)** - What Headroom promises, and which document owns which topic
 - **[Global invariants](spec/invariants.md)** - The rules no subsystem may break

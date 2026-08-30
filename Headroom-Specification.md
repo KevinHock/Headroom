@@ -42,8 +42,8 @@ Material that was never normative moved out of the corpus entirely:
 ## Reading the corpus
 
 [`spec/README.md`](spec/README.md) is the manifest. It carries the authority
-model, which document owns which topic, the precedence order between them, and a
-routing table from the path you are touching to the specifications that govern
-it.
+model, which document owns which topic, and the precedence order between them.
+Routing from the path you are touching to the specifications that govern it is
+in [`CLAUDE.md`](CLAUDE.md#routes).
 
 The full contents of this file remain in git history.
