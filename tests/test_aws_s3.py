@@ -46,12 +46,16 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [
-                {"Name": "test-bucket-1"},
-                {"Name": "test-bucket-2"},
-            ]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [
+                    {"Name": "test-bucket-1"},
+                    {"Name": "test-bucket-2"},
+                ]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         policies = {
             "test-bucket-1": {
@@ -99,9 +103,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "wildcard-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "wildcard-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         mock_s3_client.get_bucket_policy.return_value = {
             "Policy": json.dumps({
@@ -130,9 +138,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "no-policy-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "no-policy-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         error_response = {"Error": {"Code": "NoSuchBucketPolicy"}}
         mock_s3_client.get_bucket_policy.side_effect = ClientError(error_response, "GetBucketPolicy")  # type: ignore[arg-type]
@@ -148,9 +160,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "org-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "org-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         mock_s3_client.get_bucket_policy.return_value = {
             "Policy": json.dumps({
@@ -177,12 +193,55 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {"Buckets": []}
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [{"Buckets": []}]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         org_account_ids = {"333333333333"}
         results = analyze_s3_bucket_policies(mock_session, org_account_ids)
 
         assert len(results) == 0
+
+    def test_buckets_beyond_the_first_page_are_analyzed(self) -> None:
+        """
+        Every page of ListBuckets is read, not just the first.
+
+        An account holding more buckets than one response carries used to be
+        silently truncated: the buckets past the first page were never
+        scanned, never counted, and never reached the allowlist, and the
+        output could not be told apart from an account with no third-party
+        access at all. That is INV-01 exactly.
+        """
+        mock_session = MagicMock()
+        mock_s3_client = MagicMock()
+        mock_session.client.return_value = mock_s3_client
+
+        first_page = {"Buckets": [{"Name": "bucket-on-page-one"}]}
+        second_page = {"Buckets": [{"Name": "bucket-on-page-two"}]}
+
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [first_page, second_page]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
+
+        policy = json.dumps({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+                    "Action": "s3:GetObject",
+                }
+            ]
+        })
+        mock_s3_client.get_bucket_policy.return_value = {"Policy": policy}
+
+        org_account_ids = {"111111111111"}
+        results = analyze_s3_bucket_policies(mock_session, org_account_ids)
+
+        assert [result.bucket_name for result in results] == [
+            "bucket-on-page-one",
+            "bucket-on-page-two",
+        ]
 
     def test_list_buckets_error(self) -> None:
         """Test handling of list_buckets API error."""
@@ -191,7 +250,9 @@ class TestAnalyzeS3BucketPolicies:
         mock_session.client.return_value = mock_s3_client
 
         error_response = {"Error": {"Code": "AccessDenied"}}
-        mock_s3_client.list_buckets.side_effect = ClientError(error_response, "ListBuckets")  # type: ignore[arg-type]
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.side_effect = ClientError(error_response, "ListBuckets")  # type: ignore[arg-type]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         org_account_ids = {"333333333333"}
         with pytest.raises(ClientError):
@@ -203,9 +264,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "error-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "error-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         error_response = {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}
         mock_s3_client.get_bucket_policy.side_effect = ClientError(error_response, "GetBucketPolicy")  # type: ignore[arg-type]
@@ -220,9 +285,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "deny-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "deny-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         policy = {
             "Statement": [
@@ -247,9 +316,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "no-principal-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "no-principal-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         policy = {
             "Statement": [
@@ -273,9 +346,13 @@ class TestAnalyzeS3BucketPolicies:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {
-            "Buckets": [{"Name": "federated-bucket"}]
-        }
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [
+            {
+                "Buckets": [{"Name": "federated-bucket"}]
+            }
+        ]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
 
         policy = {
             "Statement": [
@@ -308,7 +385,9 @@ class TestPolicyGrammar:
         mock_s3_client = MagicMock()
         mock_session.client.return_value = mock_s3_client
 
-        mock_s3_client.list_buckets.return_value = {"Buckets": [{"Name": "test-bucket"}]}
+        bucket_paginator = MagicMock()
+        bucket_paginator.paginate.return_value = [{"Buckets": [{"Name": "test-bucket"}]}]
+        mock_s3_client.get_paginator.return_value = bucket_paginator
         mock_s3_client.get_bucket_policy.return_value = {"Policy": json.dumps(policy)}
 
         return analyze_s3_bucket_policies(mock_session, {"111111111111"})

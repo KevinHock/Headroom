@@ -102,11 +102,9 @@ A number is allocated once and never reused, because commit messages cite them
 and git history cannot be edited. **The next conflict is 7.** Whoever opens it
 advances that number here.
 
-Two further gaps are recorded where they belong rather than here, because they
-are limitations of the design rather than disagreements with it: KMS grants are
-unread ([`deny_kms_third_party_access`](rcps/deny_kms_third_party_access.md)),
-and `s3:ListBuckets` is not paginated
-([`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md)).
+One further gap is recorded where it belongs rather than here, because it is a
+limitation of the design rather than a disagreement with it: KMS grants are
+unread ([`deny_kms_third_party_access`](rcps/deny_kms_third_party_access.md)).
 
 ## Statements with no check
 

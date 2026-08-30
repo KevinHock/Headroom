@@ -55,7 +55,7 @@ Terraform variables: `deny_s3_third_party_access` and
 
 ## Evidence
 
-`s3:ListBuckets`, then `s3:GetBucketPolicy` per bucket. **Global** — S3 buckets
+`s3:ListBuckets` (paginated), then `s3:GetBucketPolicy` per bucket. **Global** — S3 buckets
 are listed once, not per region.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`. The
@@ -89,7 +89,7 @@ here.
 
 | Situation | Behavior |
 |---|---|
-| `ClientError` from `ListBuckets` | Logged and re-raised, aborting the run |
+| `ClientError` from `ListBuckets`, on any page | Logged and re-raised, aborting the run. The listing is materialized before any bucket is read, so a failure part-way through paging is reported as the listing failure it is rather than reaching the bucket-policy handler |
 | `NoSuchBucketPolicy` on one bucket | The bucket is skipped; it grants nothing |
 | Any other `ClientError` on one bucket, `AccessDenied` included | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |
@@ -124,14 +124,10 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. **`ListBuckets` is not paginated.** An account holding more buckets than one
-   response carries is silently truncated, and the buckets beyond it are neither
-   scanned nor represented in the allowlist. This is the most consequential
-   limitation of any check here, because the truncation is invisible.
-2. The synthesized bucket ARN hardcodes the `aws` partition.
-3. Access Points and ACLs are unread, so cross-account access delivered through
+1. The synthesized bucket ARN hardcodes the `aws` partition.
+2. Access Points and ACLs are unread, so cross-account access delivered through
    either is invisible.
-4. `Condition` and `Resource` are not evaluated.
+3. `Condition` and `Resource` are not evaluated.
 
 ## Acceptance scenarios
 

@@ -14,6 +14,7 @@ from boto3.session import Session
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.client import S3Client
 
+from .helpers import paginate
 from .policy_documents import (
     RESOURCE_POLICY_PRINCIPAL_TYPES,
     has_not_principal,
@@ -75,7 +76,7 @@ def analyze_s3_bucket_policies(
     and identifies account IDs that are not part of the organization.
 
     Algorithm:
-    1. List all S3 buckets via list_buckets()
+    1. List all S3 buckets via list_buckets() (paginated)
     2. For each bucket:
        a. Get bucket policy via get_bucket_policy()
        b. Parse policy JSON
@@ -100,14 +101,16 @@ def analyze_s3_bucket_policies(
     s3_client: S3Client = session.client("s3")
     results: List[S3BucketPolicyAnalysis] = []
 
+    # Materialized rather than streamed so that a failure on any page is
+    # raised here, where it is reported as the listing failure it is, rather
+    # than inside the loop where the bucket-policy handler would catch it.
     try:
-        response = s3_client.list_buckets()
-        buckets = response.get("Buckets", [])
+        pages = list(paginate(s3_client, "list_buckets"))
     except ClientError as e:
         logger.error(f"Failed to list S3 buckets from AWS API: {e}")
         raise
 
-    for bucket in buckets:
+    for bucket in [bucket for page in pages for bucket in page.get("Buckets", [])]:
         bucket_name = bucket["Name"]
         bucket_arn = f"arn:aws:s3:::{bucket_name}"
 
