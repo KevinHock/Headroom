@@ -145,7 +145,7 @@ INV-01, INV-02, INV-04, INV-06, INV-13, INV-16.
 ## Implementation
 
 - `headroom/checks/rcps/deny_secrets_manager_third_party_access.py`
-- `headroom/aws/secretsmanager.py` — `analyze_secretsmanager_policies`
+- `headroom/aws/secretsmanager.py` — `analyze_secrets_manager_policies`
 - `headroom/terraform/generate_rcps.py` — `RCP_TERRAFORM_VARIABLES`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_secrets_manager_third_party_access.py`,

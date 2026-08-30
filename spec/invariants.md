@@ -176,11 +176,23 @@ Between check collection and Terraform generation, no stage may branch on a
 hardcoded check name. A check registers itself with `@register_check` and every
 stage discovers it from the registry.
 
-The one hand-maintained exception is `RCP_TERRAFORM_VARIABLES`, which names each
-RCP check's Terraform variables; `test_table_covers_every_registered_rcp_check`
-fails by name when an entry is missing. Five RCP checks were once collected
-against every account on every run and rendered as disabled, which is
-indistinguishable in the output from a check that found nothing.
+Collection, result writing, parsing, and placement hold to this. Terraform
+generation does not, and the two generators fail differently:
+
+- **RCPs** are rendered from `RCP_TERRAFORM_VARIABLES`, a hand-maintained table.
+  It is guarded: `test_table_covers_every_registered_rcp_check` fails by name
+  when an entry is missing. Five RCP checks were once collected against every
+  account on every run and rendered as disabled, which is indistinguishable in
+  the output from a check that found nothing.
+- **SCPs** are rendered by `_build_scp_terraform_module`, which names all nine
+  checks in straight-line code and imports nothing from the registry.
+  `test_every_registered_scp_check_is_rendered` is the guard added after this
+  gap was found; before it, a tenth SCP check would have been collected,
+  written, parsed, and placed, then dropped at render with no test failing.
+
+Closing the SCP half — driving the renderer from the registry, as the RCP half
+almost is — is the standing intent. Until then the guard is the invariant's
+enforcement, and neither generator may grow a *second* hand-maintained list.
 
 ## INV-14 — Persisted results keep wire compatibility
 

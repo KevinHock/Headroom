@@ -27,7 +27,9 @@ the ability to decrypt.
 
 ### Scope
 
-The `default` key policy of every customer-managed key, in every enabled region.
+The `default` key policy of every key `kms:ListKeys` returns, in every enabled
+region. That listing is unfiltered, so AWS-managed keys are scanned alongside
+customer-managed ones.
 
 ### Non-goals
 
@@ -35,7 +37,9 @@ The `default` key policy of every customer-managed key, in every enabled region.
   `kms:CreateGrant` is invisible to this check.
 - Does not read a key policy stored under a name other than `default`.
 - Does not evaluate `Condition`, `Resource`/`NotResource`, or `NotAction`.
-- Does not distinguish AWS-managed keys from customer-managed ones.
+- Does not distinguish AWS-managed keys from customer-managed ones. An
+  AWS-managed key's policy names the owning service, which the scan reads like
+  any other principal.
 
 ## Enforced statement
 

@@ -35,8 +35,13 @@ Launches and launch-adjacent fleet APIs, restricted to the image resource.
 
 - Does not examine AMIs that exist but were never launched from.
 - Does not read launch templates or Auto Scaling group configurations.
-- Does not cover `ec2:ModifyFleet`, deliberately: it does not authorize against
-  an image resource.
+- Does not cover `ec2:ModifyFleet`, deliberately. It *does* support `ec2:Owner` —
+  raising a fleet's target capacity launches from its launch template's AMI — so
+  this is a scope decision, not an authorization limit.
+- Does not cover `ec2:RunScheduledInstances`, `ec2:ModifySpotFleetRequest`, or
+  `ec2:CreateLaunchTemplateVersion`, for the opposite reason: they list no image
+  resource, so a statement scoped to `image/*` never matches them. Naming them
+  would read as coverage while denying nothing.
 - Does not judge an AMI's contents, only who published it.
 
 ## Enforced statement

@@ -34,8 +34,12 @@ that option must not orphan an existing results directory into a full re-scan.
 
 ## Document shape
 
-Every check writes the same four top-level keys. A check may override
-`_build_results_data` to change them; none currently does.
+There are two shapes. `summary` is the only key common to both, and it is the
+only key any reader parses; the rest is evidence for a human.
+
+### SCP checks
+
+All nine take `BaseCheck._build_results_data` unchanged:
 
 | Key | Holds |
 |---|---|
@@ -46,6 +50,25 @@ Every check writes the same four top-level keys. A check may override
 
 `compliant_instances` is named for the first check written and is now generic.
 Renaming it is a wire-format migration.
+
+### RCP checks
+
+All six override `_build_results_data`, and name their keys for the resource
+they scan:
+
+| Check | Keys besides `summary` |
+|---|---|
+| `deny_ecr_third_party_access` | `repositories_third_parties_can_access`, `repositories_with_wildcards` |
+| `deny_kms_third_party_access` | `keys_third_parties_can_access`, `keys_with_wildcards` |
+| `deny_s3_third_party_access` | `buckets_third_parties_can_access`, `buckets_with_wildcards` |
+| `deny_secrets_manager_third_party_access` | `secrets_third_parties_can_access`, `secrets_with_wildcards` |
+| `deny_sqs_third_party_access` | `queues_third_parties_can_access`, `queues_with_wildcards` |
+| `deny_sts_third_party_assumerole` | `roles_third_parties_can_access`, `roles_with_wildcards` |
+
+`*_third_parties_can_access` is `violations + compliant`, so a wildcard finding
+appears in both lists. `*_with_wildcards` is `violations` alone. No RCP result
+has ever carried `violations`, `exemptions`, or `compliant_instances` at the top
+level, and changing that is a wire-format migration (INV-14).
 
 ### Summary keys every check writes
 

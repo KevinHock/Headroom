@@ -15,7 +15,7 @@ A check registers itself:
 
 ```python
 @register_check("scps", "deny_ec2_public_ip")
-class DenyEc2PublicIpCheck(BaseCheck[Ec2PublicIpResult]):
+class DenyEc2PublicIpCheck(BaseCheck[DenyEc2PublicIp]):
 ```
 
 The decorator records the class under its name, stamps `CHECK_NAME` and

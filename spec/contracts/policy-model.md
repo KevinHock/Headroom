@@ -132,7 +132,8 @@ is not a safe guess (INV-01).
 | `Deny` with `NotPrincipal` | Nothing — it restricts rather than grants, and a resource policy's Deny hands access to nobody |
 | An account ID or an ARN | The 12-digit account ID it names |
 | `Service` | Not an account principal |
-| `Federated`, `CanonicalUser` | Carry no account ID; handled per check |
+| `Federated` | Supplies no `aws:PrincipalAccount`, so no allowlist can preserve it; handled per check. A SAML provider ARN does contain twelve digits, but they name the provider's host account, not the caller's. |
+| `CanonicalUser` | An opaque S3 identifier that maps to no account ID the scan can read; handled per check |
 
 Callers must apply their own `Effect` gate **before** consulting `NotPrincipal`.
 A statement carrying both `Principal` and `NotPrincipal` is not valid IAM and

@@ -94,20 +94,31 @@ Entry shape: `arn`, `name`, `create_date`, `valid_until`, plus
 **This check reports violations in its `violations` array but omits the
 `violations` count from its `summary`.**
 
-SCP parsing reads `summary.get("violations", 0)`, so an account holding a
-hand-rolled SAML provider parses as having **zero** violations, and placement
-treats it as safe. The unconditional deny can therefore be recommended at root
-for an organization that this check has just found non-compliant.
+`build_summary_fields` returns five keys — `total_saml_providers`,
+`awssso_provider_count`, `non_awssso_provider_count`, `allowed_provider_arn`,
+and `violating_provider_arns` — and no `violations`. SCP parsing reads
+`summary.get("violations", 0)`, which therefore returns **zero for every account
+in every organization**, unconditionally.
+
+The consequence is not that the check is sometimes wrong. It is that the check
+can never hold anything back. `is_safe_for_root` in `parse_results.py` tests
+`all(r.violations == 0 for r in results)`, which is vacuously true here, so this
+check recommends the deny at **root, always** — for an organization made
+entirely of accounts it has just found non-compliant, as readily as for a clean
+one. As a safety gate it is inert.
 
 This contradicts the safety promise in
 [`../../product.md`](../../product.md) — a policy is attached only where every
 account it reaches has zero violations — and it defeats the purpose of running
-the check at all.
+the check at all. The check's own JSON is correct: `violating_provider_arns`
+lists the offenders. Only the key placement reads is missing.
 
-The blast radius is narrower than it first appears: the statement denies
-*creating* a provider, so an existing non-compliant provider keeps working. What
-breaks is any process that recreates it — infrastructure-as-code that manages the
-provider, or a disaster-recovery rebuild.
+The blast radius of the *generated policy* is narrower than it first appears:
+the statement denies *creating* a provider, so an existing non-compliant provider
+keeps working. What breaks is any process that recreates it —
+infrastructure-as-code that manages the provider, or a disaster-recovery rebuild.
+That is what makes this survivable rather than urgent; it does not make the
+verdict correct.
 
 Two things would resolve it, and both change behavior:
 

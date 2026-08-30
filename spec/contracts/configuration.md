@@ -106,10 +106,18 @@ as `management-account` still resolve against an Organizations name of
 
 ### Tag fallbacks
 
-A tag lookup that fails with `AccessDenied` is logged and yields no tags; the
-account then takes the fallbacks below rather than aborting. This is the one
-place a per-account AWS failure is tolerated, because the values are labels
-rather than evidence, and no policy decision reads them.
+A tag lookup that fails yields no tags; the account then takes the fallbacks
+below rather than aborting. This is the one place a per-account AWS failure is
+tolerated, because the values are labels rather than evidence, and no policy
+decision reads them.
+
+The tolerance is wider than it should be. `_get_account_tags` catches every
+`ClientError` and returns `{}`; only the log level distinguishes them —
+`AccessDenied` logs at warning, everything else at error with a traceback. A
+throttle or a timeout is therefore stepped over as quietly as a permissions gap,
+and the account is silently labelled `unknown`. Narrowing the catch to
+`AccessDenied` would bring this in line with INV-02 without changing what a
+generated policy contains.
 
 | Value | Fallback |
 |---|---|
