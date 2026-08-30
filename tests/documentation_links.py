@@ -2,10 +2,20 @@
 
 import re
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Set
 
 _INLINE_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 _HAS_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+_HEADING = re.compile(r"^#{1,6}[ \t]+(.+?)[ \t]*#*$", re.MULTILINE)
+_FENCE = re.compile(r"^(?:```|~~~).*?^(?:```|~~~)", re.MULTILINE | re.DOTALL)
+_NOT_SLUG = re.compile(r"[^\w\- ]", re.UNICODE)
+
+# Cursor writes intra-repository links in its rule files as mdc:<path>, always
+# relative to the repository root. The prefix reads as a URL scheme, so it has
+# to be recognized before the scheme test rather than after it.
+_CURSOR_PREFIX = "mdc:"
+
+_MARKDOWN_SUFFIXES = frozenset({".md", ".mdc"})
 
 # Directories holding third-party or generated Markdown. .tox alone carries a
 # site-packages tree of it. Named rather than matched on a leading dot, so that
@@ -22,9 +32,42 @@ _UNCHECKED_DIRECTORIES = frozenset({
 })
 
 
+def _slug(heading: str) -> str:
+    """
+    Convert a heading to the fragment identifier a renderer derives from it.
+
+    Args:
+        heading: Heading text with the leading hashes already stripped
+
+    Returns:
+        The anchor slug: lowercased, punctuation dropped, spaces hyphenated
+    """
+    return _NOT_SLUG.sub("", heading.strip().lower()).replace(" ", "-")
+
+
+def _anchors(path: Path, cache: Dict[Path, Set[str]]) -> Set[str]:
+    """
+    Collect every anchor the headings in one document define.
+
+    Args:
+        path: Markdown file to read
+        cache: Per-scan memo, since one document is linked to many times
+
+    Returns:
+        Set of anchor slugs, empty for a file that cannot be read as text
+    """
+    if path not in cache:
+        body = _FENCE.sub("", path.read_text())
+        cache[path] = {_slug(heading) for heading in _HEADING.findall(body)}
+    return cache[path]
+
+
 def find_broken_links(root: Path) -> List[str]:
     """
     Report every relative Markdown link under root whose target is missing.
+
+    A link is broken when its file does not exist, or when it carries an anchor
+    that no heading in the target document defines.
 
     Args:
         root: Directory to scan recursively for Markdown files
@@ -34,21 +77,37 @@ def find_broken_links(root: Path) -> List[str]:
         broken link
     """
     broken: List[str] = []
+    anchor_cache: Dict[Path, Set[str]] = {}
 
-    for markdown_file in root.rglob("*.md"):
+    for markdown_file in sorted(root.rglob("*")):
+        if markdown_file.suffix not in _MARKDOWN_SUFFIXES:
+            continue
+
         if not _UNCHECKED_DIRECTORIES.isdisjoint(markdown_file.relative_to(root).parts):
             continue
 
         targets: List[str] = _INLINE_LINK.findall(markdown_file.read_text())
         for target in targets:
-            if _HAS_SCHEME.match(target):
+            if target.startswith(_CURSOR_PREFIX):
+                base = root
+                reference = target[len(_CURSOR_PREFIX):]
+            elif _HAS_SCHEME.match(target):
+                continue
+            else:
+                base = markdown_file.parent
+                reference = target
+
+            path, _, anchor = reference.partition("#")
+            resolved = markdown_file if not path else base / path
+
+            if not resolved.exists():
+                broken.append(f"{markdown_file.relative_to(root)} -> {target}")
                 continue
 
-            path = target.split("#", 1)[0]
-            if not path:
+            if not anchor or resolved.suffix not in _MARKDOWN_SUFFIXES:
                 continue
 
-            if not (markdown_file.parent / path).exists():
+            if _slug(anchor) not in _anchors(resolved, anchor_cache):
                 broken.append(f"{markdown_file.relative_to(root)} -> {target}")
 
     return sorted(broken)

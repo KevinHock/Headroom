@@ -18,8 +18,29 @@ KIND_TO_CHECK_TYPE = {"scp": "scps", "rcp": "rcps"}
 
 ALLOWED_STATUSES = frozenset({"implemented", "planned", "deprecated"})
 
+# The sections spec/checks/index.md requires, in the order it requires them.
+REQUIRED_SECTIONS = (
+    "Objective",
+    "Enforced statement",
+    "Evidence",
+    "Decision table",
+    "Failure behavior",
+    "Result contract",
+    "Placement and generated policy",
+    "Accepted limitations",
+    "Acceptance scenarios",
+    "Referenced invariants",
+    "Implementation",
+)
+
+# A twelfth section is allowed where the implementation and the corpus disagree.
+# It may sit anywhere, and index.md requires it to carry a status.
+CONFLICT_SECTION_PREFIX = "Known conflict:"
+CONFLICT_STATUS = "Status: unresolved"
+
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _INVARIANT_HEADING = re.compile(r"^## (INV-\d+)\b", re.MULTILINE)
+_SECTION_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -124,6 +145,16 @@ def _document_problems(
         problems.append(f"{name} frontmatter is missing: {', '.join(missing)}")
         return problems
 
+    mistyped = [
+        field for field in ("depends_on",) + PATH_LIST_FIELDS
+        if not isinstance(frontmatter[field], list)
+    ]
+    if mistyped:
+        return [
+            f"{name} {field} must be a list, not a {type(frontmatter[field]).__name__}"
+            for field in mistyped
+        ]
+
     if frontmatter["id"] != specification.path.stem:
         problems.append(f"{name} declares id '{frontmatter['id']}', expected '{specification.path.stem}'")
 
@@ -151,6 +182,46 @@ def _document_problems(
         for relative_path in frontmatter[field]:
             if not (repository_root / relative_path).exists():
                 problems.append(f"{name} {field} names a missing path: {relative_path}")
+
+    problems.extend(_section_problems(name, specification.path.read_text()))
+
+    return problems
+
+
+def _section_problems(name: str, text: str) -> List[str]:
+    """
+    Report every way a document's sections depart from the index.md contract.
+
+    Args:
+        name: Document name for the problem descriptions
+        text: Full document text
+
+    Returns:
+        Problem descriptions
+    """
+    problems: List[str] = []
+    headings: List[str] = _SECTION_HEADING.findall(text)
+
+    conflicts = [h for h in headings if h.startswith(CONFLICT_SECTION_PREFIX)]
+    if conflicts and CONFLICT_STATUS not in text:
+        problems.append(
+            f"{name} has a Known conflict section that does not say {CONFLICT_STATUS}"
+        )
+
+    for heading in headings:
+        if heading not in REQUIRED_SECTIONS and heading not in conflicts:
+            problems.append(f"{name} has an unrecognized section: {heading}")
+
+    present = [h for h in headings if h in REQUIRED_SECTIONS]
+    for section in REQUIRED_SECTIONS:
+        if section not in present:
+            problems.append(f"{name} is missing section: {section}")
+
+    expected_order = [s for s in REQUIRED_SECTIONS if s in present]
+    for found, wanted in zip(present, expected_order):
+        if found != wanted:
+            problems.append(f"{name} orders sections {found} before {wanted}")
+            break
 
     return problems
 

@@ -30,6 +30,28 @@ verification:
 ---
 
 # deny_ec2_public_ip
+
+## Objective
+
+## Enforced statement
+
+## Evidence
+
+## Decision table
+
+## Failure behavior
+
+## Result contract
+
+## Placement and generated policy
+
+## Accepted limitations
+
+## Acceptance scenarios
+
+## Referenced invariants
+
+## Implementation
 """
 
 
@@ -191,3 +213,85 @@ class TestCorpusWideProblems:
             "deny_ec2_public_ip.md frontmatter is missing: "
             "id, kind, status, applies_to, depends_on, verification"
         )
+
+
+class TestSectionContract:
+    """Every per-check document must carry the eleven sections index.md states."""
+
+    def test_a_document_missing_a_required_section_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace("## Placement and generated policy\n\n", "")
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md is missing section: Placement and generated policy"
+        ]
+
+    def test_sections_out_of_order_are_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "## Evidence\n\n## Decision table\n",
+            "## Decision table\n\n## Evidence\n",
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md orders sections Decision table before Evidence"
+        ]
+
+    def test_an_unrecognized_section_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "## Implementation\n", "## Design notes\n\n## Implementation\n"
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md has an unrecognized section: Design notes"
+        ]
+
+    def test_a_known_conflict_section_is_allowed_anywhere(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "## Accepted limitations\n",
+            "## Known conflict: the summary omits violations\n\n"
+            "**Status: unresolved.**\n\n"
+            "## Accepted limitations\n",
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == []
+
+    def test_a_known_conflict_without_a_status_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "## Accepted limitations\n",
+            "## Known conflict: the summary omits violations\n\n"
+            "It reads zero for every account.\n\n"
+            "## Accepted limitations\n",
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md has a Known conflict section that "
+            "does not say Status: unresolved"
+        ]
+
+
+class TestMalformedFrontmatterValues:
+    """A field of the wrong YAML type must report, not raise."""
+
+    def test_a_scalar_where_a_list_belongs_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "depends_on:\n  - INV-02\n", "depends_on: INV-02\n"
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md depends_on must be a list, not a str"
+        ]
+
+    def test_an_empty_field_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace(
+            "verification:\n  - tests/test_checks_deny_ec2_public_ip.py\n", "verification:\n"
+        )
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
+            "deny_ec2_public_ip.md verification must be a list, not a NoneType"
+        ]

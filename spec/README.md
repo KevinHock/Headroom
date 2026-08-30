@@ -101,6 +101,8 @@ are derived from it and are updated with it.
 | `headroom/placement/` | [`contracts/placement.md`](contracts/placement.md) |
 | `headroom/terraform/` | [`contracts/terraform.md`](contracts/terraform.md), [`contracts/placement.md`](contracts/placement.md) |
 | `headroom/config.py`, `headroom/usage.py`, `sample_config.yaml` | [`contracts/configuration.md`](contracts/configuration.md) |
+| `headroom/main.py` | [`architecture/overview.md`](architecture/overview.md) for the stage order, and [`contracts/terraform.md`](contracts/terraform.md) for `ensure_org_info_symlink` |
+| `headroom/constants.py`, `headroom/enums.py`, `headroom/types.py`, `headroom/utils.py`, `headroom/output.py` | Whichever contract owns the value you are changing. These modules hold no behavior of their own; a constant is normative wherever it is consumed. |
 | `test_environment/modules/` | [`contracts/terraform.md`](contracts/terraform.md), [`contracts/policy-model.md`](contracts/policy-model.md), the affected `checks/*` documents |
 | `tests/` | [`verification/strategy.md`](verification/strategy.md) |
 | `spec/checks/` | [`checks/index.md`](checks/index.md) and `tests/test_spec_corpus.py` |
