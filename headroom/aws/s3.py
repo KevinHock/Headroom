@@ -8,7 +8,7 @@ specifically for identifying third-party account access (RCP checks).
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 from boto3.session import Session
 from botocore.exceptions import ClientError
@@ -16,6 +16,7 @@ from mypy_boto3_s3.client import S3Client
 
 from .helpers import paginate
 from .policy_documents import (
+    normalize_actions,
     RESOURCE_POLICY_PRINCIPAL_TYPES,
     has_not_principal,
     normalize_statements,
@@ -46,23 +47,6 @@ class S3BucketPolicyAnalysis:
     has_wildcard_principal: bool
     has_non_account_principals: bool
     actions_by_account: Dict[str, Set[str]]
-
-
-def _normalize_actions(action: Any) -> Set[str]:
-    """
-    Normalize action field to a set of action strings.
-
-    Args:
-        action: Action field from policy statement (can be string or list)
-
-    Returns:
-        Set of action strings
-    """
-    if isinstance(action, str):
-        return {action}
-    elif isinstance(action, list):
-        return set(action)
-    return set()
 
 
 def analyze_s3_bucket_policies(
@@ -157,7 +141,7 @@ def analyze_s3_bucket_policies(
             )
 
             account_ids = reading.account_ids
-            actions = _normalize_actions(statement.get("Action", []))
+            actions = normalize_actions(statement.get("Action", []))
 
             for account_id in account_ids:
                 if account_id not in org_account_ids:

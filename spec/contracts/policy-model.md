@@ -222,6 +222,16 @@ Only [`deny_sts_third_party_assumerole`](../checks/rcps/deny_sts_third_party_ass
 `sts:AssumeRole`. The other five analyzers read every `Allow` statement whatever
 it grants, and keep the action list for reporting alone.
 
+`normalize_actions` in `headroom/aws/policy_documents.py` is the only place an
+`Action` element is read, for the same reason `read_principal` is the only place
+a `Principal` element is. It answers the actions the element names and **raises
+`TypeError`** for anything that is neither a string nor an array: IAM stores an
+`Action` in one of those two shapes and nothing else, so a third shape is a
+document AWS could not have stored, on the aborting side of the line above. Five
+copies of that reader disagreed four ways before it was shared — an empty set, an
+object's keys read as though they were IAM actions, and a raise — which is the
+drift the `Principal` walk had.
+
 Where an action is matched, it is matched the way IAM matches it —
 case-insensitively, honoring `*` wildcards, and honoring `NotAction`. String
 comparison misses `sts:*`, `sts:Assume*`, `STS:AssumeRole`, and every

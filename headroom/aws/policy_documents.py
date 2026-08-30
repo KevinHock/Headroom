@@ -22,6 +22,7 @@ __all__ = [
     "TRUST_POLICY_PRINCIPAL_TYPES",
     "UnknownPrincipalTypeError",
     "has_not_principal",
+    "normalize_actions",
     "normalize_statements",
     "read_principal",
 ]
@@ -117,6 +118,36 @@ def normalize_statements(policy: Mapping[str, Any], resource_description: str) -
         )
 
     return statements
+
+
+def normalize_actions(action: Union[str, List[str]]) -> Set[str]:
+    """
+    Return a statement's Action element as a set of action strings.
+
+    IAM accepts a string or an array of strings and nothing else, so anything
+    else is a document AWS could not have stored - the same kind of trouble as
+    a principal key AWS does not document, and answered the same way. Reading
+    it as no actions would record the resource as granting nothing, which is a
+    verdict on a grant nobody measured.
+
+    Args:
+        action: The statement's Action element
+
+    Returns:
+        Every action the element names
+
+    Raises:
+        TypeError: If the element is neither a string nor a list
+    """
+    if isinstance(action, str):
+        return {action}
+
+    if isinstance(action, list):
+        return set(action)
+
+    raise TypeError(
+        f"Unexpected action type: {type(action).__name__}. Expected str or list."
+    )
 
 
 def has_not_principal(statement: Mapping[str, Any]) -> bool:

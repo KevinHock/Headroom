@@ -8,7 +8,7 @@ specifically for identifying third-party account access (RCP checks).
 import json
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Set
 
 from boto3.session import Session
 from botocore.exceptions import ClientError
@@ -16,6 +16,7 @@ from mypy_boto3_sqs.client import SQSClient
 
 from .helpers import get_all_regions
 from .policy_documents import (
+    normalize_actions,
     RESOURCE_POLICY_PRINCIPAL_TYPES,
     has_not_principal,
     normalize_statements,
@@ -34,9 +35,6 @@ QUEUE_GONE_ERROR_CODES = frozenset({
     "AWS.SimpleQueueService.NonExistentQueue",
     "QueueDoesNotExist",
 })
-
-
-ActionsType = Union[str, List[str]]
 
 
 @dataclass
@@ -63,21 +61,6 @@ class SQSQueuePolicyAnalysis:
     has_wildcard_principal: bool
     has_non_account_principals: bool
     actions_by_account: Dict[str, Set[str]]
-
-
-def _normalize_actions(actions: ActionsType) -> Set[str]:
-    """
-    Normalize action field to a set of action strings.
-
-    Args:
-        actions: Action field from policy statement (string or list)
-
-    Returns:
-        Set of action strings
-    """
-    if isinstance(actions, str):
-        return {actions}
-    return set(actions)
 
 
 def _analyze_queue_policy(
@@ -137,7 +120,7 @@ def _analyze_queue_policy(
             has_non_account_principals or reading.has_non_account_principals
         )
 
-        actions = _normalize_actions(statement.get("Action", []))
+        actions = normalize_actions(statement.get("Action", []))
 
         for account_id in reading.account_ids:
             if account_id in org_account_ids:

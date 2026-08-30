@@ -10,6 +10,7 @@ from headroom.aws.policy_documents import (
     TRUST_POLICY_PRINCIPAL_TYPES,
     UnknownPrincipalTypeError,
     has_not_principal,
+    normalize_actions,
     normalize_statements,
     read_principal,
 )
@@ -61,6 +62,53 @@ class TestNormalizeStatements:
 
         with pytest.raises(MalformedPolicyError, match="Statement of type NoneType"):
             normalize_statements(policy, "Key 'example-key' in us-east-1")
+
+
+class TestNormalizeActions:
+    def test_an_action_that_is_neither_string_nor_list_raises(self) -> None:
+        """
+        A malformed Action is a document AWS could not have stored.
+
+        IAM accepts a string or an array of strings and nothing else, so
+        anything else means Headroom has misread the document. Two analyzers
+        used to answer an empty set, recording the resource as granting no
+        action at all, which is the fallback CONVENTIONS.md forbids and a
+        verdict nobody measured.
+        """
+        with pytest.raises(TypeError) as exc_info:
+            normalize_actions(None)  # type: ignore[arg-type]
+
+        assert "NoneType" in str(exc_info.value)
+
+    def test_a_string_is_one_action(self) -> None:
+        """A lone action is stored as a bare string."""
+        assert normalize_actions("s3:GetObject") == {"s3:GetObject"}
+
+    def test_a_list_is_every_action_it_names(self) -> None:
+        """An array grants each action in it."""
+        assert normalize_actions(["sqs:SendMessage", "sqs:ReceiveMessage"]) == {
+            "sqs:SendMessage",
+            "sqs:ReceiveMessage",
+        }
+
+    def test_an_empty_list_is_no_actions(self) -> None:
+        """
+        A statement with no Action key reaches this as the empty default.
+
+        Every caller passes `statement.get("Action", [])`, so this is the
+        ordinary path for a statement that names none, not a malformed one.
+        """
+        assert normalize_actions([]) == set()
+
+    def test_a_dict_raises_rather_than_reading_its_keys(self) -> None:
+        """
+        An object Action must not be read as the set of its keys.
+
+        `set({"unexpected": "shape"})` is `{"unexpected"}`, so two analyzers
+        used to record a key name as though it were an IAM action.
+        """
+        with pytest.raises(TypeError, match="Expected str or list"):
+            normalize_actions({"unexpected": "shape"})  # type: ignore[arg-type]
 
 
 class TestHasNotPrincipal:

@@ -79,6 +79,7 @@ The `Principal` element is read by `read_principal` against
 | `Statement` neither object nor list | `MalformedPolicyError`, aborting the run |
 | Unparseable policy JSON | `json.JSONDecodeError`, aborting the run |
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
+| An `Action` that is neither a string nor a list | `TypeError`, aborting the run |
 
 **This analyzer catches nothing a policy document can raise.** It once caught
 `UnknownPrincipalTypeError` and skipped the queue, which cleared the account on

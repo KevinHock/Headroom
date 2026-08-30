@@ -11,26 +11,11 @@ from botocore.exceptions import ClientError
 
 from headroom.aws.sqs import (
     analyze_sqs_queue_policies,
-    _normalize_actions,
 )
 from headroom.aws.policy_documents import (
     MalformedPolicyError,
     UnknownPrincipalTypeError,
 )
-
-
-class TestNormalizeActions:
-    """Test _normalize_actions function."""
-
-    def test_string_action(self) -> None:
-        """Test normalizing single string action."""
-        result = _normalize_actions("sqs:SendMessage")
-        assert result == {"sqs:SendMessage"}
-
-    def test_list_actions(self) -> None:
-        """Test normalizing list of actions."""
-        result = _normalize_actions(["sqs:SendMessage", "sqs:ReceiveMessage"])
-        assert result == {"sqs:SendMessage", "sqs:ReceiveMessage"}
 
 
 class TestAnalyzeSQSQueuePolicies:

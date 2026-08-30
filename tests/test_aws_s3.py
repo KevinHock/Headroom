@@ -11,30 +11,10 @@ from botocore.exceptions import ClientError
 
 from headroom.aws.s3 import (
     analyze_s3_bucket_policies,
-    _normalize_actions,
 )
 from headroom.aws.policy_documents import (
     MalformedPolicyError,
 )
-
-
-class TestNormalizeActions:
-    """Test _normalize_actions function."""
-
-    def test_string_action(self) -> None:
-        """Test normalizing single string action."""
-        result = _normalize_actions("s3:GetObject")
-        assert result == {"s3:GetObject"}
-
-    def test_list_actions(self) -> None:
-        """Test normalizing list of actions."""
-        result = _normalize_actions(["s3:GetObject", "s3:PutObject"])
-        assert result == {"s3:GetObject", "s3:PutObject"}
-
-    def test_empty_or_invalid(self) -> None:
-        """Test normalizing empty or invalid actions."""
-        assert _normalize_actions(None) == set()
-        assert _normalize_actions({}) == set()
 
 
 class TestAnalyzeS3BucketPolicies:

@@ -81,6 +81,7 @@ The `Principal` element is read by `read_principal` against
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
+| An `Action` that is neither a string nor a list | `TypeError`, aborting the run |
 
 A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
 run. It is now a violation: the principal carries no account ID, so

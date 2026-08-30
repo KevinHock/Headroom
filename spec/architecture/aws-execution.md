@@ -167,7 +167,7 @@ for this document is that only the first kind reaches INV-02:
 
 | Kind | Example | Answer |
 |---|---|---|
-| A document AWS could not have stored | Unparseable JSON, a `Statement` that is neither object nor list, a principal key outside the four AWS documents | **Aborts.** Headroom misread the document or does not model it, and continuing would mean guessing |
+| A document AWS could not have stored | Unparseable JSON, a `Statement` that is neither object nor list, a principal key outside the four AWS documents, an `Action` that is neither a string nor an array | **Aborts.** Headroom misread the document or does not model it, and continuing would mean guessing |
 | A document AWS accepted that no allowlist can express | `Principal: "*"`, an `Allow` with `NotPrincipal`, a `Federated` or `CanonicalUser` principal | **Blocks the account** for that check. Recorded as a violation; the scan continues |
 
 The second kind used to abort in four of the five resource-policy analyzers,

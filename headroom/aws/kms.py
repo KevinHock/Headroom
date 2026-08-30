@@ -9,7 +9,7 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 from boto3.session import Session
 from botocore.exceptions import ClientError
@@ -18,6 +18,7 @@ from mypy_boto3_kms.type_defs import KeyListEntryTypeDef
 
 from .helpers import get_all_regions, paginate
 from .policy_documents import (
+    normalize_actions,
     RESOURCE_POLICY_PRINCIPAL_TYPES,
     has_not_principal,
     normalize_statements,
@@ -51,21 +52,6 @@ class KMSKeyPolicyAnalysis:
     actions_by_account: Dict[str, List[str]] = field(default_factory=dict)
     has_wildcard_principal: bool = False
     has_non_account_principals: bool = False
-
-
-def _normalize_actions(action: Any) -> List[str]:
-    """
-    Normalize action field to list of strings.
-
-    Args:
-        action: Action field from policy statement (can be string or list)
-
-    Returns:
-        List of action strings
-    """
-    if isinstance(action, str):
-        return [action]
-    return list(action)
 
 
 def _analyze_key_in_region(
@@ -143,7 +129,7 @@ def _analyze_key_in_region(
         )
         account_ids = reading.account_ids
 
-        actions = _normalize_actions(statement.get("Action", []))
+        actions = normalize_actions(statement.get("Action", []))
 
         for account_id in account_ids:
             if account_id in org_account_ids:

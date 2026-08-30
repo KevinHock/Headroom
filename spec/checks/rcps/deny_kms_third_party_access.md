@@ -89,6 +89,7 @@ in-organization principal and so is never recorded.
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
+| An `Action` that is neither a string nor a list | `TypeError`, aborting the run |
 
 A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
 run — the same divergence as

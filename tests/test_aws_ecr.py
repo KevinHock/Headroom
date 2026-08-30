@@ -11,7 +11,6 @@ from botocore.exceptions import ClientError
 
 from headroom.aws.ecr import (
     analyze_ecr_repository_policies,
-    _normalize_actions,
 )
 from headroom.aws.policy_documents import (
     MalformedPolicyError,
@@ -19,29 +18,59 @@ from headroom.aws.policy_documents import (
 )
 
 
-class TestNormalizeActions:
-    """Test _normalize_actions function."""
-
-    def test_string_action(self) -> None:
-        """Test normalizing string action."""
-        assert _normalize_actions("ecr:GetDownloadUrlForLayer") == ["ecr:GetDownloadUrlForLayer"]
-
-    def test_list_actions(self) -> None:
-        """Test normalizing list of actions."""
-        actions = ["ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"]
-        assert _normalize_actions(actions) == actions
-
-    def test_none_action(self) -> None:
-        """Test normalizing None."""
-        assert _normalize_actions(None) == []
-
-    def test_empty_list(self) -> None:
-        """Test normalizing empty list."""
-        assert _normalize_actions([]) == []
-
-
 class TestAnalyzeECRRepositoryPolicies:
     """Test analyze_ecr_repository_policies function."""
+
+    def test_an_action_that_is_neither_string_nor_list_aborts(self) -> None:
+        """
+        A malformed Action stops the run rather than reading as no actions.
+
+        IAM stores an Action as a string or an array of strings, so anything
+        else means the document was misread. Answering an empty action set
+        recorded the repository as granting nothing.
+        """
+        mock_session = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_ecr_client = MagicMock()
+
+        mock_session.client.side_effect = lambda service, **kwargs: {
+            "ec2": mock_ec2_client,
+            "ecr": mock_ecr_client,
+        }.get(service)
+
+        mock_ec2_client.describe_regions.return_value = {
+            "Regions": [{"RegionName": "us-east-1"}]
+        }
+
+        repository_paginator = MagicMock()
+        repository_paginator.paginate.return_value = [
+            {
+                "repositories": [
+                    {
+                        "repositoryName": "test-repo",
+                        "repositoryArn": "arn:aws:ecr:us-east-1:111111111111:repository/test-repo"
+                    }
+                ]
+            }
+        ]
+        mock_ecr_client.get_paginator.return_value = repository_paginator
+
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+                    "Action": {"unexpected": "shape"},
+                }
+            ]
+        }
+        mock_ecr_client.get_repository_policy.return_value = {
+            "policyText": json.dumps(policy)
+        }
+
+        with pytest.raises(TypeError, match="Expected str or list"):
+            analyze_ecr_repository_policies(mock_session, {"111111111111"})
 
     def test_successful_analysis(self) -> None:
         """Test successful ECR repository policy analysis."""

@@ -95,6 +95,7 @@ here.
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
+| An `Action` that is neither a string nor a list | `TypeError`, aborting the run |
 
 `UnsupportedPrincipalTypeError` was declared in this module and never raised —
 the mechanism the other four analyzers used and S3 deliberately did not. None of

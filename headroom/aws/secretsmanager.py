@@ -8,7 +8,7 @@ resource policies, specifically for identifying third-party account access (RCP 
 import json
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set
 
 from boto3.session import Session
 from botocore.exceptions import ClientError
@@ -17,6 +17,7 @@ from mypy_boto3_secretsmanager.client import SecretsManagerClient
 from ..types import JsonDict
 from .helpers import get_all_regions
 from .policy_documents import (
+    normalize_actions,
     RESOURCE_POLICY_PRINCIPAL_TYPES,
     has_not_principal,
     normalize_statements,
@@ -47,23 +48,6 @@ class SecretsPolicyAnalysis:
     has_wildcard_principal: bool
     has_non_account_principals: bool
     actions_by_account: Dict[str, Set[str]]
-
-
-def _normalize_actions(action: Union[str, List[str]]) -> Set[str]:
-    """
-    Normalize action field to a set of action strings.
-
-    Args:
-        action: Action field from policy statement (can be string or list)
-
-    Returns:
-        Set of action strings
-    """
-    if isinstance(action, str):
-        return {action}
-    if isinstance(action, list):
-        return set(action)
-    raise TypeError(f"Unexpected action type: {type(action).__name__}. Expected str or list.")
 
 
 def analyze_secrets_manager_policies(
@@ -235,7 +219,7 @@ def _analyze_secret_policy(
         )
 
         account_ids = reading.account_ids
-        actions = _normalize_actions(statement.get("Action", []))
+        actions = normalize_actions(statement.get("Action", []))
 
         for account_id in account_ids:
             if account_id not in org_account_ids:
