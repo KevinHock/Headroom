@@ -67,6 +67,13 @@ describes pattern 6, which nothing implements. "Document the why" is now the
 eleven-section contract in [`../checks/index.md`](../checks/index.md), enforced
 by `tests/test_spec_corpus.py` rather than asked for in prose.
 
+The exception-tag principle did survive, as the table above, but one clause of it
+did not: the requirement that an exemption record a business justification. That
+asks whoever grants an exemption to say why, and Headroom reads exemption tags
+off resources it did not create and cannot amend. The tag name carries what is
+exempted, which a scan can see; why it was granted lives wherever the tag was
+applied.
+
 ### Pattern 5 variants
 
 | | 5a | 5b | 5c |
@@ -203,6 +210,8 @@ not safety, which is what makes it a roadmap item rather than a defect. See
 ## References
 
 - [IAM policy elements](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements.html)
+- [Global condition keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html) - the `aws:`-prefixed keys, including `aws:PrincipalAccount` and the request-tag keys patterns 3 and 4 read
+- [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html) - per-service actions, and the condition keys each action supports. Evidence of what AWS has documented, not of what IAM does; see `deny_rds_unencrypted` for a key that works and is not listed
 - [Service control policies](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html)
 - [Resource control policies](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html)
 - [Organizations limits](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_reference_limits.html#min-max-values)

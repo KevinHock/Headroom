@@ -139,8 +139,15 @@ Two deliberate exceptions, both narrow:
 | Any `ClientError` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them. Wider than intended — see [`../contracts/configuration.md`](../contracts/configuration.md) |
 | Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped |
 
-`main` catches `ValueError`, `RuntimeError`, and `ClientError` at the top level to
-print a labeled error and exit non-zero. It does not continue.
+`main` catches `ValueError`, `RuntimeError`, and `ClientError` around
+organization discovery, Terraform generation, and reconciliation, printing a
+labeled error and exiting non-zero. It does not continue.
+
+The scan is **not** inside that `try`. Configuration, `perform_analysis`, and the
+security-session build run before it, so a `ClientError` in the longest phase of
+the run aborts on an unhandled traceback rather than a labeled message. Both
+abort, so INV-02 holds either way.
+[`overview.md`](overview.md#one-pass-one-direction) owns that gap.
 
 ## Required permissions
 
