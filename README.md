@@ -155,7 +155,7 @@ See [full examples](documentation/EXAMPLES.md).
 - **Secrets Manager Third-Party Access Allowlist**
 - **SQS Third-Party Access Allowlist**
 
-[View detailed check documentation](documentation/CHECKS.md)
+[View the per-check specifications](spec/checks/index.md)
 
 ### Key Capabilities
 - **Multi-region scanning** for comprehensive coverage
@@ -182,7 +182,7 @@ Security Analysis Account
 3. Analyze compliance and determine optimal policy placement
 4. Generate Terraform with smart allowlists
 
-[View detailed architecture](documentation/ARCHITECTURE.md)
+[View the architecture specification](spec/architecture/overview.md)
 
 ## Sample Output
 
@@ -233,10 +233,16 @@ module "scps_root" {
 
 ## Documentation
 
+The specification corpus in **[`spec/`](spec/README.md)** is the authority on
+intended behavior. Start at its manifest, which carries the authority model and a
+routing table from any file you are touching to the specifications that govern it.
+
+- **[Specification manifest](spec/README.md)** - What Headroom promises, and which document owns which topic
+- **[Global invariants](spec/invariants.md)** - The rules no subsystem may break
+- **[Check specifications](spec/checks/index.md)** - One document per registered check
 - **[Setup Guide](documentation/SETUP.md)** - Detailed IAM role setup and configuration
-- **[Architecture](documentation/ARCHITECTURE.md)** - Module structure and execution flow
-- **[Check Reference](documentation/CHECKS.md)** - Detailed documentation of all checks
-- **[Examples](documentation/EXAMPLES.md)** - Full Terraform and JSON output examples
+- **[Examples](documentation/EXAMPLES.md)** - Illustrative Terraform and JSON output
+- **[Test environment](test_environment/README.md)** - Live-test topology, cost, and cleanup
 - **[Adding Checks](HOW_TO_ADD_A_CHECK.md)** - Guide for contributing new checks
 - **[Roadmap](ROADMAP.md)** - Future plans and ideas
 
@@ -286,7 +292,7 @@ We welcome contributions! Here's how to get started:
 
 1. Read [CLAUDE.md](CLAUDE.md) for repository conventions and the verification steps
 2. Check out [HOW_TO_ADD_A_CHECK.md](HOW_TO_ADD_A_CHECK.md) to add new policy checks
-3. Review our [plugin system](documentation/CHECKS.md) for extensibility
+3. Write the check's specification under [`spec/checks/`](spec/checks/index.md) first - the test suite fails until it exists
 4. Ensure 100% test coverage and run `tox` before submitting
 
 **Good first issues**: Look for checks that follow similar patterns to existing ones.

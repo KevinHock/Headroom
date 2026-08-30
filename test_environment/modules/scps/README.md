@@ -125,7 +125,8 @@ launch creates. Headroom reads the instance's tag for exactly that reason, and
 treats a tagged IMDSv1 instance as exempt rather than as a blocker. It is a
 proxy and it can be wrong - a tag added afterwards with `CreateTags`, or an
 instance whose Terraform never declares it, wears the tag while its relaunch
-carries none. That cost is accepted deliberately; see `documentation/CHECKS.md`.
+carries none. That cost is accepted deliberately; see
+`../../../spec/checks/scps/deny_ec2_imds_v1.md`.
 
 Measured with `RunInstances --dry-run` under this statement: `HttpTokens=optional`
 tagged `true` is allowed, tagged `True` is denied, untagged is denied.
