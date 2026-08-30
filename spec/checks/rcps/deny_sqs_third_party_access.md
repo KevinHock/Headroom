@@ -107,6 +107,10 @@ Summary fields beyond the common three: `total_queues_analyzed`,
 Entry shape: `queue_url`, `queue_arn`, `region`, `third_party_account_ids`,
 `has_wildcard_principal`, `has_non_account_principals`, `actions_by_account`.
 
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
+
 `actions_by_account` is filtered to third-party accounts, as it is in ECR, KMS,
 S3, and Secrets Manager. The organization filter runs where an account is
 admitted rather than over a set collected first, so the entry's account set and

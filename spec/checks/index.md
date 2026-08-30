@@ -38,10 +38,13 @@ statement is specified once in
 | [`deny_secrets_manager_third_party_access`](rcps/deny_secrets_manager_third_party_access.md) | Regional | `secretsmanager:*` | Recorded as violations |
 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | Regional | `sqs:*` | Recorded as violations |
 | [`deny_sts_third_party_assumerole`](rcps/deny_sts_third_party_assumerole.md) | Global | `sts:AssumeRole` | **Not a finding** — its RCP denies `sts:AssumeRole` alone, which a federated identity cannot call |
+| [`deny_service_confused_deputy`](rcps/deny_service_confused_deputy.md) | Both | All six of the above | **Not read** — it measures source guards, not principals |
 
 The five resource-policy analyzers read the `Principal` element through one
 function, `read_principal`, and reach one verdict from it. The sixth reads the
-same facts and acts on two of the three, for the reason its column gives.
+same facts and acts on two of the three, for the reason its column gives. The
+seventh issues no API calls of its own: it reads the service principal sources
+the other six already record, so the estate is scanned once.
 [`../contracts/policy-model.md`](../contracts/policy-model.md) owns the rule.
 
 ## The per-check document contract
@@ -103,8 +106,11 @@ and git history cannot be edited. **The next conflict is 7.** Whoever opens it
 advances that number here.
 
 One further gap is recorded where it belongs rather than here, because it is a
-limitation of the design rather than a disagreement with it: KMS grants are
-unread ([`deny_kms_third_party_access`](rcps/deny_kms_third_party_access.md)).
+limitation of the design rather than a disagreement with it: a service principal
+trusted with **no** source guard is dropped rather than reported, on volume, so
+discovery cannot find an out-of-organization account driving it — only CloudTrail
+can ([`deny_service_confused_deputy`](rcps/deny_service_confused_deputy.md),
+limitation 1). It is the largest deployment risk the corpus currently carries.
 
 ## Statements with no check
 

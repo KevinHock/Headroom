@@ -115,6 +115,10 @@ Summary fields beyond the common three: `total_secrets_analyzed`,
 Entry shape: `secret_name`, `secret_arn`, `third_party_account_ids`,
 `has_wildcard_principal`, `has_non_account_principals`, `actions_by_account`.
 
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
+
 `has_non_account_principals` carries the verdict rather than decorating it: it
 is the field that makes a secret naming a `Federated` or `CanonicalUser`
 principal a violation. It was dead while the analyzer raised instead of setting

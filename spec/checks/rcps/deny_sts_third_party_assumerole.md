@@ -147,6 +147,10 @@ Summary fields beyond the common three: `total_roles_analyzed`,
 Entry shape: `role_name`, `role_arn`, `third_party_account_ids`,
 `has_wildcard_principal`.
 
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
+
 `summary.violations` and `summary.unique_third_party_accounts` are both required
 on read (INV-01): the first decides whether the account can take the RCP, and an
 absent second is not the same answer as an empty one.

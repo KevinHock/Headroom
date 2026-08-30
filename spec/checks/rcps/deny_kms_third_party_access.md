@@ -35,8 +35,6 @@ customer-managed ones.
 
 ### Non-goals
 
-- Does not read KMS **grants**. Cross-account access delivered through
-  `kms:CreateGrant` is invisible to this check.
 - Does not read a key policy stored under a name other than `default`.
 - Does not evaluate `Condition`, `Resource`/`NotResource`, or `NotAction`.
 - Does not distinguish AWS-managed keys from customer-managed ones. An
@@ -58,7 +56,14 @@ Terraform variables: `deny_kms_third_party_access` and
 ## Evidence
 
 Per enabled region: `kms:ListKeys` (paginated), then `kms:GetKeyPolicy` with
-`PolicyName="default"` per key.
+`PolicyName="default"` and `kms:ListGrants` (paginated) per key.
+
+A key authorizes cross-account access two ways, and both are read. From each
+grant: `GranteePrincipal`, `RetiringPrincipal`, `Operations`, and whether it
+carries `Constraints`. A grantee outside the organization enters
+`third_party_account_ids` with the grant's operations; a retiring principal
+enters it with `kms:RetireGrant` alone, which is the only thing a retiring
+principal can do.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
 The `Principal` element is read by `read_principal` against
@@ -115,6 +120,10 @@ Summary fields beyond the common three: `total_keys_analyzed`,
 Entry shape: `key_id`, `key_arn`, `region`, `third_party_account_ids`,
 `actions_by_account`, `has_wildcard_principal`, `has_non_account_principals`.
 
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
+
 `actions_by_account` is filtered to third-party accounts.
 
 `keys_with_wildcards` counts every violation, so a key blocked only by a
@@ -127,15 +136,11 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. **Grants are unread.** A `kms:CreateGrant` to an external account grants
-   decrypt access that this check cannot see, so an account can look clean and
-   still lose that access when the RCP is attached. This is the one limitation
-   here that can cause a *deployed* policy to break existing access.
-2. Only the `default` key policy is read.
-3. `Condition`, `Resource`, and `NotAction` are not evaluated.
-4. `_normalize_actions` calls `list()` on a non-string `Action`, which raises
-   `TypeError` on `None` and yields dict keys on a mapping.
-5. AWS documents federated principals only for role trust policies, so a
+1. Only the `default` key policy is read.
+2. `Condition`, `Resource`, and `NotAction` are not evaluated.
+3. A grant's `Constraints` are recorded as a boolean, not read. A grant narrowed
+   by an encryption context still contributes its grantee to the allowlist.
+4. AWS documents federated principals only for role trust policies, so a
    `Federated` principal in a key policy may grant nothing at all. It is still
    counted as a blocker, because whether the grant is live is not readable from
    the document and INV-01 forbids assuming it is not.

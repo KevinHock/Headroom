@@ -109,11 +109,11 @@ class TestTheRealCorpus:
     def test_every_registered_check_has_exactly_one_specification(self) -> None:
         assert find_corpus_problems(SPEC_ROOT, get_check_type_map()) == []
 
-    def test_the_corpus_covers_all_fifteen_checks(self) -> None:
-        # An independent count: nine SCP modules and six RCP modules ship today,
-        # so a document added or dropped without a check shows up here.
+    def test_the_corpus_covers_all_sixteen_checks(self) -> None:
+        # An independent count: nine SCP modules and seven RCP modules ship
+        # today, so a document added or dropped without a check shows up here.
         specifications = load_check_specifications(SPEC_ROOT)
-        assert len(specifications) == 15
+        assert len(specifications) == 16
 
     def test_invariants_are_numbered_without_gaps(self) -> None:
         identifiers = invariant_ids(SPEC_ROOT)

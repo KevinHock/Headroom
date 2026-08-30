@@ -32,8 +32,8 @@ Bucket policies.
 
 ### Non-goals
 
-- Does not read S3 Access Points, Multi-Region Access Points, bucket ACLs, or
-  Object Lambda access point policies.
+- Does not read S3 Access Points, Multi-Region Access Points, or Object Lambda
+  access point policies.
 - Does not evaluate `Condition` or `Resource`/`NotResource`. See
   [`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 - Does not read Block Public Access settings.
@@ -55,8 +55,16 @@ Terraform variables: `deny_s3_third_party_access` and
 
 ## Evidence
 
-`s3:ListBuckets` (paginated), then `s3:GetBucketPolicy` per bucket. **Global** — S3 buckets
-are listed once, not per region.
+`s3:ListBuckets` (paginated), then `s3:GetBucketAcl` and `s3:GetBucketPolicy`
+per bucket. **Global** — S3 buckets are listed once, not per region.
+
+The ACL is read before the policy, because a bucket that shares only by ACL
+carries no policy at all and abandoning it for want of one would skip the grant
+most likely to be the only grant on it. A `CanonicalUser` grantee other than the
+bucket owner carries no account ID, so no allowlist can preserve it and it
+blocks the account; the `AllUsers` and `AuthenticatedUsers` group URIs are read
+as a wildcard; the `LogDelivery` group URI is ignored. Any other grantee type or
+group URI raises `UnknownGranteeTypeError`.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`. The
 bucket ARN is synthesized as `arn:aws:s3:::<name>`.
@@ -118,6 +126,10 @@ Summary fields beyond the common three: `total_buckets_analyzed`,
 Entry shape: `bucket_name`, `bucket_arn`, `third_party_account_ids`,
 `has_wildcard_principal`, `has_non_account_principals`, `actions_by_account`.
 
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
+
 ## Placement and generated policy
 
 RCP placement: blocked at `violations > 0`; the allowlist is the union of
@@ -126,9 +138,13 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 ## Accepted limitations
 
 1. The synthesized bucket ARN hardcodes the `aws` partition.
-2. Access Points and ACLs are unread, so cross-account access delivered through
-   either is invisible.
-3. `Condition` and `Resource` are not evaluated.
+2. Access Points are unread, so cross-account access delivered through one is
+   invisible.
+3. An ACL grantee's permission is not read, only that the grant exists. A
+   grantee holding `READ_ACP` alone counts the same as one holding `FULL_CONTROL`.
+4. A bucket whose Object Ownership is `BucketOwnerEnforced` has ACLs disabled,
+   and the ACL read still happens.
+5. `Condition` and `Resource` are not evaluated.
 
 ## Acceptance scenarios
 

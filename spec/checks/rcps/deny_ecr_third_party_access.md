@@ -53,7 +53,15 @@ Terraform variables: `deny_ecr_third_party_access` and
 ## Evidence
 
 Per enabled region: `ecr:DescribeRepositories` (paginated), then
-`ecr:GetRepositoryPolicy` per repository.
+`ecr:GetRepositoryPolicy` per repository, and `ecr:GetRegistryPolicy` once.
+
+ECR authorizes through two policies rather than one, and they are separate
+resources rather than two halves of the same one, so each gets its own analysis
+and `scope` says which was read. A registry policy AWS enforces on every ECR
+request in the region governs no single repository, so its analysis carries no
+repository name or ARN. `RegistryPolicyNotFoundException` means the region has
+none and is not a failure. Both policies share one statement reader, because
+they share a grammar; what differs is reach.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
 The `Principal` element is read by `read_principal` against
@@ -104,9 +112,16 @@ Summary fields beyond the common three: `total_repositories_analyzed`,
 `violations`, `unique_third_party_accounts`, `third_party_account_count`,
 `actions_by_account`.
 
-Entry shape: `repository_name`, `repository_arn`, `region`,
-`third_party_account_ids`, `actions_by_account`, `has_wildcard_principal`,
-`has_non_account_principals`.
+Entry shape: `scope` (`"repository"` or `"registry"`), `region`,
+`third_party_account_ids`, `repository_name`, `repository_arn`,
+`actions_by_account`, `has_wildcard_principal`, `has_non_account_principals`.
+
+`repository_name` and `repository_arn` are null on a registry-scoped entry,
+which governs no single repository.
+
+Every entry also carries `service_principal_sources`, which this check does not
+read. It is recorded here because the estate is scanned once, and it is read by
+[`deny_service_confused_deputy`](deny_service_confused_deputy.md).
 
 `actions_by_account` is filtered to third-party accounts.
 

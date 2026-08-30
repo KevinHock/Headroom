@@ -24,6 +24,7 @@ from headroom.aws.policy_documents import (
     MalformedPolicyError,
     UnknownPrincipalTypeError,
 )
+from tests.constants import ORG_ID
 
 
 class TestAnalyzeIamRolesTrustPolicies:
@@ -59,7 +60,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111", "222222222222"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].role_name == "ThirdPartyRole"
@@ -96,7 +97,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111", "222222222222"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].role_name == "PublicRole"
@@ -132,7 +133,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111", "222222222222"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 0
 
@@ -166,7 +167,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 0
 
@@ -216,7 +217,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111", "222222222222"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].role_name == "ThirdPartyRole"
@@ -252,7 +253,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 0
 
@@ -288,7 +289,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         org_account_ids = {"111111111111"}
 
         with pytest.raises(UnknownPrincipalTypeError) as exc_info:
-            analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+            analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert "UnknownType" in str(exc_info.value)
 
@@ -324,7 +325,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         org_account_ids = {"111111111111"}
 
         with pytest.raises(InvalidFederatedPrincipalError) as exc_info:
-            analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+            analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert "BadFederatedRole" in str(exc_info.value)
         assert "AssumeRoleWithSAML" in str(exc_info.value) or "AssumeRoleWithWebIdentity" in str(exc_info.value)
@@ -361,7 +362,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         org_account_ids = {"111111111111"}
 
         # Should not raise any exception
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         # No third-party accounts, no wildcards, so results should be empty
         assert len(results) == 0
@@ -395,7 +396,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         # Statement without principal should be skipped
         assert len(results) == 0
@@ -436,7 +437,7 @@ class TestAnalyzeIamRolesTrustPolicies:
 
         org_account_ids = {"111111111111"}
         with pytest.raises(json.JSONDecodeError):
-            analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+            analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
     def test_role_listing_client_error_raises(self) -> None:
         """Test that AWS API errors during role listing are raised."""
@@ -451,7 +452,7 @@ class TestAnalyzeIamRolesTrustPolicies:
 
         org_account_ids = {"111111111111"}
         with pytest.raises(ClientError):
-            analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+            analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
     def test_role_with_dict_trust_policy(self) -> None:
         """Test handling of role with trust policy already as dict (not URL-encoded)."""
@@ -483,7 +484,7 @@ class TestAnalyzeIamRolesTrustPolicies:
         ]
 
         org_account_ids = {"111111111111"}
-        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids)
+        results = analyze_iam_roles_trust_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].role_name == "MyRole"
@@ -645,7 +646,6 @@ class TestTrustPolicyActionMatching:
     it working. `NotAction` was dropped the same way, since only `Action` was
     ever read.
     """
-
     PARTNER = "999999999999"
     ORG = {"111111111111"}
 
@@ -667,7 +667,7 @@ class TestTrustPolicyActionMatching:
             }
         ]
         found: Set[str] = set()
-        for result in analyze_iam_roles_trust_policies(mock_session, self.ORG):
+        for result in analyze_iam_roles_trust_policies(mock_session, self.ORG, ORG_ID):
             found.update(result.third_party_account_ids)
         return found
 
@@ -784,7 +784,7 @@ class TestTrustPolicyGrammar:
             }
         ]
 
-        return analyze_iam_roles_trust_policies(mock_session, {"111111111111"})
+        return analyze_iam_roles_trust_policies(mock_session, {"111111111111"}, ORG_ID)
 
     def test_lone_statement_object_is_analyzed(self) -> None:
         """The third party in a lone statement object is found, not missed."""
@@ -862,3 +862,46 @@ class TestTrustPolicyGrammar:
         })
 
         assert results == []
+
+    def test_guarded_service_principal_is_recorded(self) -> None:
+        """
+        A trust policy pinning a third-party source records it on the role.
+
+        The account reaches the allowlist through the confused deputy
+        check, not through this analysis's third_party_account_ids.
+        """
+        results = self._analyze({
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "sns.amazonaws.com"},
+                "Action": "sts:AssumeRole",
+                "Condition": {
+                    "StringEquals": {"aws:SourceAccount": "999999999999"}
+                },
+            }],
+        })
+
+        assert len(results[0].service_principal_sources) == 1
+        source = results[0].service_principal_sources[0]
+        assert source.service_principal == "sns.amazonaws.com"
+        assert source.source_account_ids == ["999999999999"]
+
+        # The source is inert here: it belongs to deny_service_confused_deputy,
+        # and folding it into these fields would widen this check's allowlist
+        # with an account that drives a service call rather than making one.
+        assert results[0].third_party_account_ids == set()
+        assert results[0].has_wildcard_principal is False
+
+    def test_a_policy_with_no_service_principal_records_nothing(self) -> None:
+        """The field stays empty when no statement names a service."""
+        results = self._analyze({
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+                "Action": "sts:AssumeRole",
+            }],
+        })
+
+        assert results[0].service_principal_sources == []

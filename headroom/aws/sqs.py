@@ -7,7 +7,7 @@ specifically for identifying third-party account access (RCP checks).
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
 from boto3.session import Session
@@ -16,11 +16,13 @@ from mypy_boto3_sqs.client import SQSClient
 
 from .helpers import get_all_regions
 from .policy_documents import (
-    normalize_actions,
     RESOURCE_POLICY_PRINCIPAL_TYPES,
+    ServicePrincipalSource,
     has_not_principal,
+    normalize_actions,
     normalize_statements,
     read_principal,
+    read_service_principal_sources,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,13 @@ class SQSQueuePolicyAnalysis:
         has_non_account_principals: True if the policy grants to a principal
             type carrying no account ID, which no allowlist can preserve
         actions_by_account: Dict mapping account IDs to sets of allowed actions
+        service_principal_sources: Service principals this policy trusts,
+            with the cross-service source guard on each, or a single entry
+            recording that the queue's policy could not be read at all.
+            Read by the deny_service_confused_deputy check; contributes
+            nothing to this analysis's own third-party accounts or wildcard
+            flag, so a queue kept only for one of these entries stays
+            invisible to the deny_sqs_third_party_access check.
     """
     queue_url: str
     queue_arn: str
@@ -61,6 +70,7 @@ class SQSQueuePolicyAnalysis:
     has_wildcard_principal: bool
     has_non_account_principals: bool
     actions_by_account: Dict[str, Set[str]]
+    service_principal_sources: List[ServicePrincipalSource] = field(default_factory=list)
 
 
 def _analyze_queue_policy(
@@ -68,7 +78,8 @@ def _analyze_queue_policy(
     queue_arn: str,
     region: str,
     policy_json: str,
-    org_account_ids: Set[str]
+    org_account_ids: Set[str],
+    org_id: str
 ) -> SQSQueuePolicyAnalysis:
     """
     Analyze a single queue's resource policy.
@@ -79,6 +90,8 @@ def _analyze_queue_policy(
         region: AWS region
         policy_json: Policy JSON string
         org_account_ids: Set of organization account IDs to exclude
+        org_id: This organization's ID, deciding whether an
+            organization scope on a source guard names this organization
 
     Returns:
         SQSQueuePolicyAnalysis result
@@ -94,6 +107,7 @@ def _analyze_queue_policy(
     actions_by_account: Dict[str, Set[str]] = {}
     has_wildcard_principal = False
     has_non_account_principals = False
+    sources: List[ServicePrincipalSource] = []
 
     statements = normalize_statements(policy, f"Queue {queue_arn} in {region}")
 
@@ -110,6 +124,10 @@ def _analyze_queue_policy(
         principal = statement.get("Principal")
         if not principal:
             continue
+
+        sources.extend(
+            read_service_principal_sources(statement, org_account_ids, org_id, f"Queue {queue_arn}")
+        )
 
         reading = read_principal(
             principal, RESOURCE_POLICY_PRINCIPAL_TYPES, f"Queue {queue_arn} in {region}"
@@ -138,13 +156,15 @@ def _analyze_queue_policy(
         has_wildcard_principal=has_wildcard_principal,
         has_non_account_principals=has_non_account_principals,
         actions_by_account=actions_by_account,
+        service_principal_sources=sources,
     )
 
 
 def _analyze_queues_in_region(
     session: Session,
     region: str,
-    org_account_ids: Set[str]
+    org_account_ids: Set[str],
+    org_id: str
 ) -> List[SQSQueuePolicyAnalysis]:
     """
     Analyze SQS queues in a specific region.
@@ -160,10 +180,17 @@ def _analyze_queues_in_region(
     makes an `AccessDenied` here a genuine permissions gap rather than an
     expected regional block. See documentation/SETUP.md.
 
+    A queue whose policy is unparseable, or names a principal key AWS does not
+    document, aborts the run rather than being recorded or discarded. Either is
+    a read Headroom could not complete, and a queue absent from the results is
+    indistinguishable from one that grants nobody access.
+
     Args:
         session: boto3.Session for the target account
         region: AWS region to analyze
         org_account_ids: Set of organization account IDs to exclude
+        org_id: This organization's ID, deciding whether an
+            organization scope on a source guard names this organization
 
     Returns:
         List of SQSQueuePolicyAnalysis results for queues with policies
@@ -212,7 +239,8 @@ def _analyze_queues_in_region(
                     queue_arn=queue_arn,
                     region=region,
                     policy_json=policy_json,
-                    org_account_ids=org_account_ids
+                    org_account_ids=org_account_ids,
+                    org_id=org_id
                 ))
 
     except ClientError as e:
@@ -224,7 +252,8 @@ def _analyze_queues_in_region(
 
 def analyze_sqs_queue_policies(
     session: Session,
-    org_account_ids: Set[str]
+    org_account_ids: Set[str],
+    org_id: str
 ) -> List[SQSQueuePolicyAnalysis]:
     """
     Analyze SQS queue policies across all regions.
@@ -248,6 +277,8 @@ def analyze_sqs_queue_policies(
     Args:
         session: boto3.Session for the target account
         org_account_ids: Set of organization account IDs to exclude from results
+        org_id: This organization's ID, deciding whether an
+            organization scope on a source guard names this organization
 
     Returns:
         List of SQSQueuePolicyAnalysis results
@@ -263,7 +294,7 @@ def analyze_sqs_queue_policies(
 
     for region in regions:
         logger.info(f"Analyzing SQS queues in {region}")
-        regional_results = _analyze_queues_in_region(session, region, org_account_ids)
+        regional_results = _analyze_queues_in_region(session, region, org_account_ids, org_id)
         all_results.extend(regional_results)
 
     logger.info(

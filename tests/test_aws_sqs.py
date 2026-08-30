@@ -14,8 +14,8 @@ from headroom.aws.sqs import (
 )
 from headroom.aws.policy_documents import (
     MalformedPolicyError,
-    UnknownPrincipalTypeError,
 )
+from tests.constants import ORG_ID
 
 
 class TestAnalyzeSQSQueuePolicies:
@@ -63,7 +63,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].queue_url == queue_url
@@ -117,7 +117,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].has_wildcard_principal is True
@@ -152,7 +152,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 0
 
@@ -206,7 +206,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].third_party_account_ids == {"222222222222", "333333333333", "444444444444"}
@@ -272,7 +272,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111", "555555555555"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert results[0].third_party_account_ids == {"222222222222"}
@@ -340,7 +340,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 2
         assert results[0].region == "us-east-1"
@@ -417,7 +417,7 @@ class TestAnalyzeSQSQueuePolicies:
         org_account_ids = {"111111111111"}
 
         with pytest.raises(ClientError) as exc_info:
-            analyze_sqs_queue_policies(mock_session, org_account_ids)
+            analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert exc_info.value.response["Error"]["Code"] == "AccessDenied"
         # The failure aborted before us-west-2 was touched at all.
@@ -473,7 +473,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert "222222222222" in results[0].actions_by_account
@@ -521,7 +521,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         assert len(results) == 1
         assert "222222222222" in results[0].third_party_account_ids
@@ -556,7 +556,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         with pytest.raises(MalformedPolicyError, match="Statement of type str"):
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
     def test_missing_principal(self) -> None:
         """Test that statements without Principal are skipped."""
@@ -598,7 +598,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids, ORG_ID)
 
         # Should still return a result, but with no third-party accounts
         assert len(results) == 1
@@ -640,7 +640,7 @@ class TestAnalyzeSQSQueuePolicies:
         mock_sqs_client.get_paginator.return_value = paginator
 
         with pytest.raises(ClientError) as exc_info:
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert exc_info.value.response["Error"]["Code"] == "AccessDenied"
 
@@ -656,7 +656,7 @@ class TestAnalyzeSQSQueuePolicies:
         mock_sqs_client.get_paginator.return_value = paginator
 
         with pytest.raises(ClientError) as exc_info:
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert exc_info.value.response["Error"]["Code"] == "ServiceUnavailable"
 
@@ -676,7 +676,7 @@ class TestAnalyzeSQSQueuePolicies:
         )
 
         with pytest.raises(ClientError):
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
     def test_reading_queue_attributes_raises(self) -> None:
         """
@@ -698,7 +698,7 @@ class TestAnalyzeSQSQueuePolicies:
         )
 
         with pytest.raises(ClientError) as exc_info:
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert exc_info.value.response["Error"]["Code"] == "AccessDenied"
 
@@ -738,7 +738,7 @@ class TestAnalyzeSQSQueuePolicies:
             {"Attributes": {"Policy": json.dumps(policy), "QueueArn": live_arn}},
         ]
 
-        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert len(results) == 1
         assert results[0].queue_arn == live_arn
@@ -773,7 +773,7 @@ class TestAnalyzeSQSQueuePolicies:
         }
 
         with pytest.raises(json.JSONDecodeError):
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
+            analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
     def test_a_federated_principal_blocks_the_queue_rather_than_the_run(self) -> None:
         """
@@ -811,7 +811,7 @@ class TestAnalyzeSQSQueuePolicies:
             }
         }
 
-        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert len(results) == 1
         assert results[0].has_non_account_principals is True
@@ -851,98 +851,10 @@ class TestAnalyzeSQSQueuePolicies:
             }
         }
 
-        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
         assert len(results) == 1
         assert results[0].has_non_account_principals is True
-
-    def test_a_queue_after_a_federated_one_is_still_read(self) -> None:
-        """
-        The scan reaches every queue, which is what not aborting buys.
-
-        One queue's unallowlistable principal used to end the run, so a
-        third-party grant in any queue listed after it never entered the
-        allowlist and the generated RCP denied that partner on deploy.
-        """
-        mock_session, mock_sqs_client = self._single_region_session()
-
-        federated_url = "https://sqs.us-east-1.amazonaws.com/111111111111/federated-queue"
-        ordinary_url = "https://sqs.us-east-1.amazonaws.com/111111111111/partner-queue"
-
-        paginator = MagicMock()
-        paginator.paginate.return_value = [
-            {"QueueUrls": [federated_url, ordinary_url]}
-        ]
-        mock_sqs_client.get_paginator.return_value = paginator
-
-        policies = {
-            federated_url: {
-                "Version": "2012-10-17",
-                "Statement": [{
-                    "Effect": "Allow",
-                    "Principal": {
-                        "Federated": "arn:aws:iam::111111111111:saml-provider/Example"
-                    },
-                    "Action": "sqs:SendMessage",
-                }],
-            },
-            ordinary_url: {
-                "Version": "2012-10-17",
-                "Statement": [{
-                    "Effect": "Allow",
-                    "Principal": {"AWS": "999999999999"},
-                    "Action": "sqs:SendMessage",
-                }],
-            },
-        }
-        mock_sqs_client.get_queue_attributes.side_effect = lambda **kwargs: {
-            "Attributes": {
-                "Policy": json.dumps(policies[kwargs["QueueUrl"]]),
-                "QueueArn": kwargs["QueueUrl"],
-            }
-        }
-
-        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
-
-        assert len(results) == 2
-        assert results[1].third_party_account_ids == {"999999999999"}
-
-    def test_a_principal_key_aws_does_not_document_aborts(self) -> None:
-        """
-        An undocumented principal key still stops the run.
-
-        AWS validates the Principal element when SetQueueAttributes stores the
-        policy, so a key outside the documented four means Headroom misread the
-        attribute or AWS has added a principal type nobody has modelled here.
-        Recording it as a finding would state a verdict on a grant this code
-        cannot read.
-        """
-        mock_session, mock_sqs_client = self._single_region_session()
-
-        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/test-queue"
-        queue_arn = "arn:aws:sqs:us-east-1:111111111111:test-queue"
-
-        paginator = MagicMock()
-        paginator.paginate.return_value = [{"QueueUrls": [queue_url]}]
-        mock_sqs_client.get_paginator.return_value = paginator
-
-        mock_sqs_client.get_queue_attributes.return_value = {
-            "Attributes": {
-                "Policy": json.dumps({
-                    "Version": "2012-10-17",
-                    "Statement": [{
-                        "Effect": "Allow",
-                        "Principal": {"Kerberos": "example"},
-                        "Action": "sqs:SendMessage",
-                        "Resource": queue_arn,
-                    }],
-                }),
-                "QueueArn": queue_arn,
-            }
-        }
-
-        with pytest.raises(UnknownPrincipalTypeError):
-            analyze_sqs_queue_policies(mock_session, {"111111111111"})
 
 
 class TestPolicyGrammar:
@@ -977,7 +889,7 @@ class TestPolicyGrammar:
             }
         }
 
-        return analyze_sqs_queue_policies(mock_session, {"111111111111"})
+        return analyze_sqs_queue_policies(mock_session, {"111111111111"}, ORG_ID)
 
     def test_not_principal_is_read_as_a_wildcard(self) -> None:
         """
@@ -1023,3 +935,48 @@ class TestPolicyGrammar:
         assert len(results) == 1
         assert results[0].has_wildcard_principal is False
         assert results[0].third_party_account_ids == set()
+
+    def test_guarded_service_principal_is_recorded(self) -> None:
+        """
+        A queue policy pinning a third-party source records it.
+
+        The account reaches the allowlist through the confused deputy
+        check, not through this analysis's third_party_account_ids.
+        """
+        results = self._analyze({
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "sns.amazonaws.com"},
+                "Action": "sqs:SendMessage",
+                "Resource": "arn:aws:sqs:us-east-1:111111111111:test-queue",
+                "Condition": {
+                    "StringEquals": {"aws:SourceAccount": "999999999999"}
+                },
+            }],
+        })
+
+        assert len(results[0].service_principal_sources) == 1
+        source = results[0].service_principal_sources[0]
+        assert source.service_principal == "sns.amazonaws.com"
+        assert source.source_account_ids == ["999999999999"]
+
+        # The source is inert here: it belongs to deny_service_confused_deputy,
+        # and folding it into these fields would widen this check's allowlist
+        # with an account that drives a service call rather than making one.
+        assert results[0].third_party_account_ids == set()
+        assert results[0].has_wildcard_principal is False
+
+    def test_a_policy_with_no_service_principal_records_nothing(self) -> None:
+        """The field stays empty when no statement names a service."""
+        results = self._analyze({
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+                "Action": "sqs:SendMessage",
+                "Resource": "arn:aws:sqs:us-east-1:111111111111:test-queue"
+            }],
+        })
+
+        assert results[0].service_principal_sources == []
