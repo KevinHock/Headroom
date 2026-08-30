@@ -101,27 +101,25 @@ attributed to the wrong policy.
 
 When `exclude_account_ids` is set, before the file is written:
 
-1. A 12-digit account ID inside an `arn:aws:` ARN, anywhere in the document, is
+1. Every 12-digit account ID inside an ARN, anywhere in the document, is
    replaced with `REDACTED`. The match is on the ARN's account field
-   specifically — `arn:aws:<service>:<region>:<account>:` — so an account-shaped
-   number elsewhere in a string survives.
+   specifically — `arn:<partition>:<service>:<region>:<account>:` — so an
+   account-shaped number elsewhere in a string survives, and so does one in a
+   string that is not an ARN.
 2. `summary.account_id` is removed.
 
-### Known gap: only the `aws` partition is redacted
+**Every partition, not only `aws`.** GovCloud, China, and the isolated regions
+append hyphenated qualifiers to the partition — `aws-us-gov`, `aws-cn`,
+`aws-iso-b` — and an operator there sets `exclude_account_ids` for the same
+reason a commercial one does. The pattern once matched the literal `arn:aws:`,
+so those partitions kept their account IDs in a file written specifically to be
+committed. Nothing in `test_environment/` exercises a non-commercial partition,
+which is why it survived; `test_redact_every_aws_partition` pins it now.
 
-The pattern matches the literal string `arn:aws:`. An `arn:aws-us-gov:` or
-`arn:aws-cn:` ARN carries its account ID through into the written file, so an
-operator running in GovCloud or China with `exclude_account_ids: true` gets a
-results directory that discloses exactly what the setting exists to withhold —
-and the setting exists so those files can be committed.
-
-Widening the pattern to `arn:aws[a-z0-9-]*:` closes it. That is a one-line
-change, but it changes what a persisted file contains, so an existing GovCloud
-results directory would not match a re-run byte for byte (INV-14).
-
-**Status: unresolved.** Reported rather than fixed. Nothing in
-`test_environment/` exercises a non-commercial partition, so the gap has never
-been observed in this repository — which is why it survived.
+Redaction being partition-agnostic does not make Headroom runnable outside the
+commercial partition — the role ARNs it assumes are still hardcoded, per
+[`../architecture/aws-execution.md`](../architecture/aws-execution.md). This
+closes the leak ahead of that rather than after it.
 
 Redaction is not reversible in general. SCP parsing restores IAM user ARNs by
 substituting the account ID back in once the account has been identified, because

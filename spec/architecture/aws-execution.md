@@ -110,6 +110,23 @@ An account attached directly to the organization root has `parent_ou_id` of
 `None` and an `ou_path` of `["Root"]`. It belongs to no OU and cannot be targeted
 by an OU-level policy; the root ID is not a substitute.
 
+## Partitions
+
+**Headroom runs in the commercial `aws` partition only.** All three role ARNs in
+`analysis.py` are built as `arn:aws:iam::<account>:role/<name>`, so the first
+`sts:AssumeRole` against a GovCloud, China, or isolated-region account fails.
+The partition is not configurable and is not derived from the caller.
+
+This is a limitation, not a decision — nothing about the design depends on it,
+and closing it means deriving the partition once from the caller's own identity
+rather than threading a config field through. Elsewhere the code is already
+partition-agnostic: the ARN pattern that extracts account IDs from policy
+documents matches any partition ([`../contracts/policy-model.md`](../contracts/policy-model.md)),
+and so does result redaction ([`../contracts/results.md`](../contracts/results.md)).
+Two synthesized ARNs hardcode `aws` cosmetically, recorded at
+[`deny_ec2_public_ip`](../checks/scps/deny_ec2_public_ip.md) and
+[`deny_s3_third_party_access`](../checks/rcps/deny_s3_third_party_access.md).
+
 ## Failure policy
 
 A failure anywhere in analysis aborts the whole run (INV-02). There is no
