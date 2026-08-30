@@ -77,6 +77,12 @@ level, and changing that is a wire-format migration (INV-14).
 | `account_name` | string | As resolved by `use_account_name_from_tags` |
 | `account_id` | string | **Absent** when `exclude_account_ids` is set |
 | `check` | string | The registered check name |
+| `violations` | integer | The count, written even when it is always zero |
+
+`violations` is the count every placement decision turns on, and it is written by
+all fifteen registered checks. A check whose every entry is compliant writes zero
+rather than omitting the key: a reader cannot tell an absent key from a genuine
+zero, and the two mean opposite things.
 
 Everything else in `summary` comes from the check's `build_summary_fields` and is
 specified in that check's document under [`../checks/`](../checks/index.md).
@@ -89,13 +95,20 @@ missing key and a legitimately empty value mean opposite things (INV-01).
 | Key | Required by | Missing means |
 |---|---|---|
 | `check` | RCP parsing | The file cannot be confirmed to belong to its directory |
-| `violations` | RCP parsing | Whether the account can take the RCP is unknown |
+| `violations` | SCP and RCP parsing | Whether the account is safe is unknown, and defaulting answers it in the safest direction |
 | `unique_third_party_accounts` | RCP parsing | The allowlist would render empty, which denies every third party (INV-06) |
 | `unique_ami_owners` | `deny_ec2_ami_owner` parsing | Indistinguishable from an account that ran no instances |
 
 RCP parsing additionally rejects a file whose `summary.check` disagrees with the
 directory it was found in: a result filed under the wrong check would be
 attributed to the wrong policy.
+
+SCP parsing defaulted `violations` to zero until
+`deny_iam_saml_provider_not_aws_sso` shipped without the key and had every
+account it rejected cleared for a root-level deny. The remaining SCP summary
+fields — `exemptions`, `compliant`, `compliance_percentage`, `total_instances` —
+are still defaulted, deliberately: no placement decision reads them, so a missing
+one costs accuracy in a report rather than safety in a policy.
 
 ## Redaction
 

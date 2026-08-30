@@ -2011,3 +2011,67 @@ class TestAmiOwnerAllowlistWiring:
 
         assert len(result) == 1
         assert result[0].ec2_allowed_ami_owners is None
+
+
+class TestAMissingViolationCountIsRejected:
+    """
+    A result file with no `violations` key aborts rather than reading as safe.
+
+    Placement's whole safety test is `violations == 0`, so defaulting the
+    missing key to zero turned an unanswerable question into the safest
+    possible answer. That is the shape INV-01 forbids, and it was not
+    hypothetical: `deny_iam_saml_provider_not_aws_sso` shipped without the key
+    and had every account it rejected cleared for a root-level deny.
+
+    A file that reaches here without the key is stale - written before its
+    check emitted the count - and the fix is to re-run that check, which the
+    error says.
+    """
+
+    def write_summary(self, directory: Path, summary: Dict[str, Any]) -> str:
+        check_dir = directory / "scps" / "deny_ec2_imds_v1"
+        check_dir.mkdir(parents=True)
+        result_file = check_dir / "test-account_111111111111.json"
+        result_file.write_text(json.dumps({"summary": summary}))
+        return str(result_file)
+
+    def hierarchy(self) -> OrganizationHierarchy:
+        return OrganizationHierarchy(
+            root_id="r-1111",
+            organizational_units={},
+            accounts={
+                "111111111111": AccountOrgPlacement(
+                    account_id="111111111111",
+                    account_name="test-account",
+                    parent_ou_id=None,
+                    ou_path=["Root"],
+                )
+            },
+        )
+
+    def test_a_summary_without_the_key_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.write_summary(Path(temp_dir), {
+                "account_name": "test-account",
+                "account_id": "111111111111",
+                "check": "deny_ec2_imds_v1",
+                "compliant": 4,
+            })
+
+            with pytest.raises(RuntimeError, match="no violations count"):
+                parse_scp_result_files(temp_dir, self.hierarchy())
+
+    def test_an_explicit_zero_is_not_a_missing_key(self) -> None:
+        """Zero is an answer. Only absence is the failure."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.write_summary(Path(temp_dir), {
+                "account_name": "test-account",
+                "account_id": "111111111111",
+                "check": "deny_ec2_imds_v1",
+                "violations": 0,
+                "compliant": 4,
+            })
+
+            parsed = parse_scp_result_files(temp_dir, self.hierarchy())
+
+        assert [result.violations for result in parsed] == [0]

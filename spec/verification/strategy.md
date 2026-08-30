@@ -95,6 +95,8 @@ replacing it removes an invariant's only enforcement.
 | `test_the_conflict_register_and_the_check_documents_agree` | The conflict register and the per-check documents name the same checks |
 | `test_the_documented_count_matches_what_the_live_test_directory_holds` | INV-15 — the standing exception's stated size matches the directory |
 | `test_no_identifier_from_the_exception_appears_outside_it` | INV-15 — a real identifier stays inside `test_environment/` |
+| `test_a_summary_without_the_key_raises` | INV-01 — a missing violation count aborts rather than clearing the account |
+| `test_a_written_result_parses` | Each check's own output survives the reader that consumes it |
 
 ## What the corpus test enforces
 

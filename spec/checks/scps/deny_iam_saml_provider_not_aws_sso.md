@@ -111,6 +111,11 @@ rejected. `test_a_wholly_non_compliant_account_does_not_parse_as_safe` pins the
 round trip through parsing rather than the summary alone, because the summary
 was never the part that was visibly wrong.
 
+The default that let it happen is gone too: SCP parsing now raises on a summary
+with no `violations` key rather than reading zero
+([`../../contracts/results.md`](../../contracts/results.md)), so a check that
+repeats the omission stops the run instead of silently clearing every account.
+
 ## Accepted limitations
 
 1. **Not paginated.** `ListSAMLProviders` is called once. An account holding more

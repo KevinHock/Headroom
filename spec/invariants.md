@@ -213,6 +213,13 @@ accounts without any reader failing.
 account-name-plus-ID filename forms, so an existing results directory still
 resumes after `exclude_account_ids` changes.
 
+**One deliberate break.** SCP parsing once defaulted a missing `summary.violations`
+to zero and now raises. A results directory written before every check emitted the
+key no longer parses, and the error names the check to re-run. The invariant is
+about not changing a format silently; this changes one loudly, on purpose, because
+the tolerance it replaces was reading an unanswered safety question as a pass
+(INV-01).
+
 ## INV-15 — AWS identifiers in the repository are obviously fake
 
 Every account ID, instance ID, AMI ID, ARN, KMS key ID, and Organizations

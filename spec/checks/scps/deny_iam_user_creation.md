@@ -87,13 +87,18 @@ Base document shape. Summary fields beyond the common three:
 |---|---|
 | `total_users` | Count of users found |
 | `users` | A list of ARN **strings** — not objects |
+| `violations` | Always zero. Written, not omitted. |
 
-There is **no `violations` key and no `compliance_percentage` key**, which for
-this check is consistent: every entry is compliant, so the zero parsing supplies
-by default is the true count. That is not a general licence to omit the key —
+The count is structurally zero here: `categorize_result` returns `COMPLIANT` for
+every user, so the check has no way to produce a violation. It is written anyway,
+because a reader cannot tell an absent key from a genuine zero and SCP parsing
+now refuses to guess ([`../../contracts/results.md`](../../contracts/results.md)).
+Omitting it is what made
 [`deny_iam_saml_provider_not_aws_sso`](deny_iam_saml_provider_not_aws_sso.md)
-omitted it while producing real violations, and every account it rejected read
-back as safe until it was fixed.
+inert as a safety gate.
+
+There is no `compliance_percentage` key. Nothing reads it for this check, and a
+percentage over a population that is compliant by construction says nothing.
 
 Entry shape in `compliant_instances`: `user_name`, `user_arn`, `path`.
 `violations` and `exemptions` are always empty.
