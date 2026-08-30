@@ -66,7 +66,7 @@ headroom/
 ├── analysis.py          account projections; runs checks per account
 ├── aws/                 one module per AWS service; all API calls live here
 │   ├── sessions.py      the only place a boto3 Session is constructed
-│   ├── helpers.py       enabled-region discovery, pagination
+│   ├── helpers.py       enabled-region discovery, pagination, tag matching
 │   ├── organization.py  Organizations API and the OU tree
 │   └── policy_documents.py  shared grammar for reading IAM policy documents
 ├── checks/              one module per check; registry and BaseCheck

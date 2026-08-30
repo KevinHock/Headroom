@@ -859,7 +859,10 @@ Four ways they drift apart, all observed in this repo:
    against its own rule, and note that `StringEqualsIgnoreCase` exists when you
    want the other comparison. Where a principal could carry the key twice in
    cases that differ, AWS calls the result an unexpected condition failure -
-   raise rather than pick one.
+   raise rather than pick one. All three rules live in
+   `find_tag_value_as_iam_matches` in `headroom/aws/helpers.py`; call it rather
+   than writing the comparison again. Two checks reading the same kind of tag
+   by two different rules is what conflict 5 was.
 
 3. **Request state vs. resource state.** A condition key on a create action is
    evaluated against the request, not against the object that results, so a
@@ -1186,7 +1189,7 @@ if_check_has_exemptions:
       prose alone. See AP-009 habit 3.
 
   - path: tests/test_aws_{service}.py
-    must_test: [right_dimension_exempts, wrong_dimension_does_not, value_case_is_exact]
+    must_test: [right_dimension_exempts, wrong_dimension_does_not, value_case_is_exact, key_case_is_ignored, key_twice_in_differing_cases_raises]
 
 optional_modify:
   - path: test_environment/test_{check_name}.tf

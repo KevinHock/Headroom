@@ -39,6 +39,13 @@ AWS_ARN_ACCOUNT_ID_PATTERN = r'^arn:aws[a-z0-9-]*:[^:]+:[^:]*:(\d{12}):'
 IMDS_EXEMPTION_TAG_KEY = "ExemptFromIMDSv2"
 IMDS_EXEMPTION_TAG_VALUE = "true"
 
+# The paved-road tag deny_eks_create_cluster_without_tag requires. Read by the
+# same rule as the IMDS pair above: the key matches without regard to case,
+# the value does not. The Terraform module spells both out again; changing
+# one here does not change it there.
+EKS_PAVED_ROAD_TAG_KEY = "PavedRoad"
+EKS_PAVED_ROAD_TAG_VALUE = "true"
+
 # Check name constants
 
 # SCP Checks (alphabetical by service)

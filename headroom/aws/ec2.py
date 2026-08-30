@@ -11,7 +11,7 @@ from mypy_boto3_ec2.type_defs import ImageTypeDef
 
 from ..constants import IMDS_EXEMPTION_TAG_KEY, IMDS_EXEMPTION_TAG_VALUE
 from ..enums import AmiOwnerUnknownReason
-from .helpers import get_all_regions
+from .helpers import find_tag_value_as_iam_matches, get_all_regions
 
 logger = logging.getLogger(__name__)
 
@@ -113,58 +113,6 @@ class DenyEc2PublicIp:
     instance_arn: str
 
 
-def _find_exemption_tag_value(
-    tags: Dict[str, str],
-    instance_id: str,
-) -> Optional[str]:
-    """
-    Find the exemption tag's value the way IAM matches the condition key.
-
-    The two halves of the match pull opposite ways, and the scanner has to
-    follow both. IAM matches the tag key in `aws:RequestTag/<key>` without
-    regard to case, so matching it exactly here would report an instance
-    tagged `exemptfromimdsv2` as a violation that enforcement exempts. The
-    value is compared with StringNotEquals, which is case-sensitive, so
-    lowercasing it would report an instance tagged "True" as exempt when
-    enforcement denies its relaunch.
-
-    An instance carrying the key twice in cases that differ has no
-    determinate answer. AWS documents that as an unexpected condition failure
-    rather than a match on one of them, so there is nothing to report, and
-    guessing which one IAM lands on would invent the exemption status of a
-    live workload.
-
-    Args:
-        tags: The instance's tags
-        instance_id: The instance the tags came from, named in the error
-
-    Returns:
-        The tag's value, or None when the instance does not carry it
-
-    Raises:
-        RuntimeError: If the instance carries the key more than once, in
-            cases that differ
-    """
-    wanted_key = IMDS_EXEMPTION_TAG_KEY.lower()
-    matches = {
-        key: value for key, value in tags.items() if key.lower() == wanted_key
-    }
-
-    if len(matches) > 1:
-        raise RuntimeError(
-            f"Instance {instance_id} carries {IMDS_EXEMPTION_TAG_KEY} more "
-            f"than once in cases that differ ({', '.join(sorted(matches))}). "
-            f"IAM matches the tag key in aws:RequestTag without regard to "
-            f"case, so every one of them matches the SCP's condition key "
-            f"while at most one value can - which AWS documents as an "
-            f"unexpected condition failure. Whether a relaunch of this "
-            f"instance is exempt cannot be determined, and guessing would "
-            f"misreport whether the SCP is safe to attach here."
-        )
-
-    return next(iter(matches.values()), None)
-
-
 def get_ec2_imds_v1_analysis(session: Session) -> List[DenyEc2ImdsV1]:
     """
     Report every live instance's IMDS token setting and exemption tag.
@@ -247,8 +195,8 @@ def get_ec2_imds_v1_analysis(session: Session) -> List[DenyEc2ImdsV1]:
                             tag['Key']: tag['Value']
                             for tag in instance.get('Tags', [])
                         }
-                        exemption_value = _find_exemption_tag_value(
-                            tags, instance_id
+                        exemption_value = find_tag_value_as_iam_matches(
+                            tags, IMDS_EXEMPTION_TAG_KEY, f"Instance {instance_id}"
                         )
 
                         results.append(DenyEc2ImdsV1(

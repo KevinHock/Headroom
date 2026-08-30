@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/scps/deny_ec2_imds_v1.py
   - headroom/aws/ec2.py
+  - headroom/aws/helpers.py
 depends_on:
   - INV-02
   - INV-09
@@ -106,7 +107,7 @@ Exemptions count toward compliance in the summary: `compliant_count` is
 |---|---|
 | `ClientError` in any region | `RuntimeError`, aborting the run (INV-02) |
 | Unreadable region | Not distinguished from any other `ClientError`; the run aborts |
-| Instance carries `ExemptFromIMDSv2` twice in differing cases | `RuntimeError` — which of the two values IAM would compare is not guessable |
+| Instance carries `ExemptFromIMDSv2` twice in differing cases | `RuntimeError` from the shared tag reader — which of the two values IAM would compare is not guessable |
 | Tag absent | Not exempt |
 
 ## Result contract
@@ -169,6 +170,8 @@ INV-02, INV-09, INV-16.
 
 - `headroom/checks/scps/deny_ec2_imds_v1.py`
 - `headroom/aws/ec2.py` — `get_ec2_imds_v1_analysis`
+- `headroom/aws/helpers.py` — `find_tag_value_as_iam_matches`, shared with
+  [`deny_eks_create_cluster_without_tag`](deny_eks_create_cluster_without_tag.md)
 - `headroom/constants.py` — `IMDS_EXEMPTION_TAG_KEY`, `IMDS_EXEMPTION_TAG_VALUE`
 - `test_environment/modules/scps/locals.tf`
 - Tests: `tests/test_checks_deny_ec2_imds_v1.py`, `tests/test_aws_ec2.py`
