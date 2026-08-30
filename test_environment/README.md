@@ -85,6 +85,10 @@ terraform init
 terraform apply
 ```
 
+`terraform.tfvars` holds a real email address — every account created here needs
+a unique one, so it is typically a personal address with plus-addressing. It is
+gitignored and must stay that way. Only `terraform.tfvars.example` is committed.
+
 Then run Headroom against it from the security analysis account:
 
 ```bash

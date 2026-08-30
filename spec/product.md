@@ -64,14 +64,14 @@ is a reconciled projection of the current run and holds nothing else.
 
 ## Non-goals
 
-Headroom deliberately does not do these things. Each is a design decision, not a
-gap awaiting implementation.
+Headroom deliberately does not do these things. Each is a design decision rather
+than a gap awaiting implementation, with the one exception marked below.
 
 | Non-goal | Why |
 |---|---|
 | Apply Terraform, or attach any policy | Headroom writes files. A human reviews and applies them. |
 | Remediate violations | It reports what a policy would break; fixing that is the workload owner's decision. |
-| Evaluate policy conditions during RCP analysis | See [`contracts/policy-model.md`](contracts/policy-model.md). A condition that narrows a grant is not read as narrowing it. |
+| Evaluate policy conditions during RCP analysis | The one row here that *is* a gap rather than a decision. A condition that narrows a grant is not read as narrowing it, which costs coverage and not safety. See [`contracts/policy-model.md`](contracts/policy-model.md) and [`../ROADMAP.md`](../ROADMAP.md). |
 | Analyze historical activity | Deployability is decided from current resource state, not from CloudTrail. Listed under [`../ROADMAP.md`](../ROADMAP.md). |
 | Analyze the management account | SCPs and RCPs do not restrict it. See [`architecture/aws-execution.md`](architecture/aws-execution.md). |
 | Guarantee an *undeployable* policy stays undeployable | A check reports the state it observed. New violations after a scan are the next run's problem. |

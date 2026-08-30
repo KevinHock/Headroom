@@ -64,7 +64,10 @@ regions the account has enabled — `opt-in-not-required` and `opted-in`, never
 
 An enabled region does not guarantee the service is available there. Handling a
 missing regional endpoint is each check's concern, and each check's document
-states what it does.
+states what it does. An absent endpoint raises botocore's
+`EndpointConnectionError`, which is **not** a `ClientError` subclass, so an
+`except ClientError` never catches it — the reason a region-loop that looks
+defended can still abort the run.
 
 ## The three account projections
 

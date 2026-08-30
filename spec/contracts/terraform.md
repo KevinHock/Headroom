@@ -161,3 +161,17 @@ Organizations limit **at plan time** rather than at apply time, and both
 AWS permits at most 5 directly attached policies of each type per target, or 4
 where `FullAWSAccess` is still attached. Headroom emits one policy of each type
 per target and does not manage that budget.
+
+**The RCP budget is exhaustible.** `modules/rcps/rcps.tf` creates exactly one
+`aws_organizations_policy`, so all six statements share one document. With every
+statement includable, the scaffolding alone costs roughly 1,900 of the 5,120
+characters and each additional twelve-digit account ID about 14 more, leaving
+room for a couple of hundred allowlist entries across all six lists combined. A
+large enough organization will hit the plan-time `error()`.
+
+**Splitting across a second policy is deliberately not implemented.** A loud
+failure at plan time is the correct outcome: the alternative is silently
+truncating an allowlist and denying access the organization depends on, which
+is the safety promise inverted. Changes to `modules/rcps/` are in any case a
+non-goal for the generator, which writes module *calls* and never module
+bodies.

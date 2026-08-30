@@ -18,5 +18,7 @@
 .tox
 .ruff_cache
 my_config.yaml
+terraform.tfvars
+*/terraform.tfvars
 .superpowers/
 docs/superpowers/

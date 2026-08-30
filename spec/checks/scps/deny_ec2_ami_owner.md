@@ -86,6 +86,27 @@ Only `amazon` and `aws-marketplace` are recognized aliases. Any other alias
 aborts the run rather than entering an allowlist as a value `ec2:Owner` may never
 hold.
 
+### Measured
+
+`RunInstances --dry-run` against the statement this repository generates:
+
+| AMI | Allowlist | Result |
+|---|---|---|
+| Amazon Linux 2023 (`ImageOwnerAlias: amazon`) | numeric `OwnerId` | DENY |
+| Amazon Linux 2023 | `["amazon"]` | ALLOW |
+| Amazon Linux 2023 | numeric `OwnerId` and `"amazon"` | ALLOW |
+| Rocky Linux (no `ImageOwnerAlias`) | numeric `OwnerId` | ALLOW |
+| Rocky Linux | `["amazon"]` | DENY |
+
+Rows 1 and 4 are the whole rule: for an aliased AMI the numeric owner does not
+satisfy `ec2:Owner`, and for an unaliased one it is the only thing that does.
+Recording the wrong half of the pair denies a launch the scan had just cleared.
+
+`aws-marketplace` is inferred from the `amazon` rows rather than measured. Every
+reachable Marketplace AMI required a subscription, and EC2 returns
+`OptInRequired` before it evaluates the statement, so a dry run there cannot
+tell an allow from a deny.
+
 ## Decision table
 
 | State | Condition | Category |
