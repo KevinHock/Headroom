@@ -215,6 +215,17 @@ length, and a body of one repeated digit: `111111111111`,
 An identifier arriving from a bug report, error message, console screenshot, or
 API response is real. Rewrite it before it enters the repository.
 
+**One standing exception.** `test_environment/` commits thirteen real
+twelve-digit account IDs belonging to third-party vendors — in the live-test
+Terraform, in the results it produced, and in the RCP allowlist generated from
+them. They are load-bearing: an IAM trust policy naming an account that does not
+exist is rejected at `terraform apply`, so rewriting them would break the live
+test this repository uses to prove its own output. They are public vendor
+identifiers rather than the operator's, which is what makes the trade acceptable
+and does not make it compliant. No new one may be added, and no identifier
+outside `test_environment/` is covered.
+[`../test_environment/README.md`](../test_environment/README.md) describes where
+they appear.
 ## INV-16 — Credentials are minted regionally, and only enabled regions are scanned
 
 Every boto3 session is built by `headroom/aws/sessions.py` with

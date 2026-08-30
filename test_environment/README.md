@@ -165,8 +165,10 @@ committed output is stale.
 
 **These files contain real AWS account IDs** belonging to third-party security
 vendors, used as the third-party accounts the RCP scenarios grant access to. They
-do not follow the fake-identifier convention in INV-15
-([`../spec/invariants.md`](../spec/invariants.md)) because a trust policy naming a
-non-existent account is rejected at apply time, so the live scenarios need real
-ones. This is a known conflict with that invariant, recorded rather than
-resolved.
+appear in the root `.tf` files, in `headroom_results/rcps/`, and in the generated
+`rcps/acme_acquisition_ou_rcps.tf`.
+
+This is the standing exception to INV-15, recorded at the invariant itself
+([`../spec/invariants.md`](../spec/invariants.md)) — this file describes where
+the identifiers are, not whether they are allowed. No new one may be added, and
+nothing outside `test_environment/` is covered.

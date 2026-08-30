@@ -135,6 +135,19 @@ changes which policies are generated. See [`../index.md`](../index.md).
 broken allowlist round trip (INV-07), though a harmless one, because the
 statement takes no allowlist.
 
+## Placement and generated policy
+
+| | |
+|---|---|
+| Terraform variable | `deny_iam_saml_provider_not_aws_sso`, a bare boolean |
+| Allowlist variable | None. The statement takes no allowlist. |
+| Allowlist round trip | Not applicable, though `allowed_provider_arn` is written as if there were one — see the known conflict |
+| Placement input | `summary.violations`, which this check never writes |
+
+Placement is therefore unconditional: this check recommends root for every
+organization. See the known conflict above for why that is wrong and what would
+fix it.
+
 ## Accepted limitations
 
 1. **Not paginated.** `ListSAMLProviders` is called once. An account holding more

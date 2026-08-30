@@ -96,19 +96,32 @@ Entry shape: `cluster_name`, `cluster_arn`, `region`, `tags`,
 Standard SCP placement at zero violations. Terraform variable
 `deny_eks_create_cluster_without_tag`, a boolean. No allowlist.
 
+## Known conflict: the tag key is matched case-sensitively
+
+IAM matches condition key *names* without regard to case, and the tag key in
+`aws:RequestTag/PavedRoad` is part of the name. The analyzer compares it exactly,
+so a cluster tagged `pavedroad=true` is reported as a violation although
+enforcement would match its recreation.
+
+This is the opposite of the treatment [`deny_ec2_imds_v1`](deny_ec2_imds_v1.md)
+gives its key, where the asymmetry between key matching and value matching was
+measured against the live API (INV-09). Two checks read the same kind of tag by
+two different rules, and only one of them can be right.
+
+The direction here is conservative: it over-reports violations, so the policy is
+under-deployed rather than deployed where it would break something. That is why
+it is survivable, not why it is correct.
+
+**Status: unresolved.** Recorded rather than fixed, because matching the key
+case-insensitively clears accounts this check currently blocks, which changes
+which policies are generated. See [`../index.md`](../index.md).
+
 ## Accepted limitations
 
-1. **The tag key is matched case-sensitively, and IAM's is not.** A cluster
-   tagged `pavedroad=true` is reported as a violation although
-   `aws:RequestTag/PavedRoad` would match its recreation. This is the opposite of
-   the treatment [`deny_ec2_imds_v1`](deny_ec2_imds_v1.md) gives its key, where
-   the asymmetry between key and value matching was measured. The direction here
-   is conservative — it over-reports violations and so under-deploys the policy —
-   but the two checks should read tags the same way.
-2. The tag key and value `PavedRoad` / `true` are written literally in both the
+1. The tag key and value `PavedRoad` / `true` are written literally in both the
    analyzer and the Terraform module, with no shared constant. Changing one does
    not change the other.
-3. A cluster deleted mid-scan aborts the run rather than being skipped, unlike
+2. A cluster deleted mid-scan aborts the run rather than being skipped, unlike
    the comparable cases in [`deny_lambda_auth_type_none`](deny_lambda_auth_type_none.md)
    and [`deny_sqs_third_party_access`](../rcps/deny_sqs_third_party_access.md).
 
