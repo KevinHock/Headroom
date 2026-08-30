@@ -1,0 +1,9 @@
+---
+description: Specification governing configuration and CLI surface
+globs: headroom/config.py,headroom/usage.py,sample_config.yaml
+alwaysApply: false
+---
+
+[spec/contracts/configuration.md](mdc:spec/contracts/configuration.md) owns the
+config fields, CLI options, precedence, and defaults. A default is set once, in
+`config.py`, and used downstream.

@@ -5,11 +5,12 @@
 document_type: implementation_guide
 target_audience: [ai_assistant, experienced_developer]
 context_dependencies:
+  - spec/README.md
+  - spec/invariants.md
+  - spec/contracts/policy-model.md
   - headroom/checks/base.py
   - headroom/checks/registry.py
-  - documentation/POLICY_TAXONOMY.md
-version: 2.0
-last_updated: 2025-11-17
+normative_authority: spec/
 optimization: llm_first
 ```
 
@@ -37,7 +38,7 @@ optimization: llm_first
     }
   },
   "step_2_pattern": {
-    "reference": "documentation/POLICY_TAXONOMY.md",
+    "reference": "spec/contracts/policy-model.md",
     "common_patterns": {
       "Pattern_1": "Absolute Deny (no conditions)",
       "Pattern_2": "Conditional Deny (most common for SCPs)",
@@ -55,6 +56,20 @@ optimization: llm_first
 
 ```yaml
 execution_order:
+  phase_0_specification:
+    file: spec/checks/{scps|rcps}/{check_name}.md
+    action: write_first
+    why: |
+      The specification is the deliverable; the implementation expresses it.
+      Deciding the enforced statement, the decision table, and the accepted
+      limitations before writing code is what stops the scanner and the policy
+      from measuring different things.
+    contract: spec/checks/index.md
+    enforced_by: |
+      tests/test_spec_corpus.py fails if a registered check has no
+      specification, if its frontmatter is incomplete, or if it cites an
+      invariant that does not exist.
+
   phase_1_constants:
     file: headroom/constants.py
     action: add_constant
@@ -111,6 +126,7 @@ execution_order:
 
   phase_7_validation:
     commands:
+      - "pytest tests/test_spec_corpus.py"
       - "mypy headroom/ tests/"
       - "pytest tests/ --cov=headroom"
       - "tox"
@@ -811,43 +827,30 @@ neither, should raise rather than be guessed at.
 
 ### AP-009: Scanning a Different Dimension Than the Policy Enforces
 
-```python
-# ❌ BAD - the SCP exempts by role tag; this reads the instance's tags
-for tag in instance.get('Tags', []):
-    if tag['Key'] == 'ExemptFromIMDSv2' and tag['Value'].lower() == 'true':
-        exemption_tag_present = True
+[INV-09](spec/invariants.md#inv-09--scan-the-dimension-the-policy-enforces) is
+the rule: read the dimension your statement conditions on, or declare the
+substitution and what it costs. This entry is the authoring habit behind it.
 
-# ✅ GOOD - read the dimension the condition key reads
-resolved = resolve_instance_profile_role(iam_client, profile_arn)
-role_exemption_tag_present = (
-    resolved.tags.get(IMDS_EXEMPTION_TAG_KEY) == IMDS_EXEMPTION_TAG_VALUE
-)
-```
-
-*Both halves of this example are historical, and the verdict was
-statement-specific.* The role tag was right for `DenyRoleDeliveryLessThan2`,
-which exempts on `aws:PrincipalTag`. That statement was later removed (AP-011),
-leaving only the launch-time one, which exempts on `aws:RequestTag` - and for
-*that* statement the instance's own tag is the correct thing to read, because
-`TagSpecifications` populates the request key and tags the instance in one
-act. The check reads instance tags again today.
-
-So do not read this entry as "instance tags are always wrong". Read it as: the
-dimension is a property of the statement, and it changes when the statement
-does. Re-derive it every time the policy moves.
-
-A check decides whether a policy is safe to attach. That answer is only as
-good as the match between what the scanner measures and what the policy
-evaluates. Three ways they drift apart, all observed in this repo:
+A check decides whether a policy is safe to attach. That answer is only as good
+as the match between what the scanner measures and what the policy evaluates.
+Four ways they drift apart, all observed in this repo:
 
 1. **Wrong dimension.** `aws:PrincipalTag/X`, `aws:RequestTag/X` and a tag on
    the resource are three different things wearing the same tag name. The
-   `deny_ec2_imds_v1` scanner read instance tags for a policy that exempts by
-   role tag, so accounts reported zero violations while enforcement would deny
-   every API call those instances made - the scan named the instances that
-   would break as its evidence the SCP was safe.
-2. **Wrong case sensitivity - in both directions at once.** A tag condition
-   key has two halves that match by opposite rules. IAM matches condition key
+   `deny_ec2_imds_v1` scanner once read instance tags for a statement that
+   exempted by *role* tag, so accounts reported zero violations while
+   enforcement would deny every API call those instances made - the scan named
+   the instances that would break as its evidence the SCP was safe. The role
+   tag was right for that statement. It is not right for the launch-time
+   statement that replaced it, which exempts on `aws:RequestTag`, and for which
+   the instance's own tag is a defensible proxy because `TagSpecifications`
+   populates the request key and tags the instance in one act. The dimension is
+   a property of the statement and changes when the statement does. Re-derive
+   it every time the policy moves; do not read this entry as "instance tags are
+   always wrong".
+
+2. **Wrong case sensitivity - in both directions at once.** A tag condition key
+   has two halves that match by opposite rules. IAM matches condition key
    *names* without regard to case, and the tag key in
    `aws:PrincipalTag/ExemptFromIMDSv2` is part of the name, so
    `exemptfromimdsv2` matches. `StringNotEquals` compares the *value*
@@ -857,31 +860,32 @@ evaluates. Three ways they drift apart, all observed in this repo:
    want the other comparison. Where a principal could carry the key twice in
    cases that differ, AWS calls the result an unexpected condition failure -
    raise rather than pick one.
+
 3. **Request state vs. resource state.** A condition key on a create action is
    evaluated against the request, not against the object that results, so a
    scan of running resources is not automatically a scan of what enforcement
-   will see. Be careful about the inverse mistake too: "the request" is not the
-   same as "the literal parameters the caller typed".
-   `ec2:MetadataHttpTokens` was measured resolving from the effective
-   configuration - an AMI with `imds-support=v2.0` populates it as `required`
-   for a request that names no `MetadataOptions` - so the naive reading
-   overstated the gap. Where a scan genuinely cannot observe the enforced
-   dimension, say so in the check's docstring instead of implying the clean
-   scan covers it.
+   will see. The inverse mistake is just as easy: "the request" is not "the
+   literal parameters the caller typed". `ec2:MetadataHttpTokens` resolves from
+   the effective configuration - an AMI with `imds-support=v2.0` populates it
+   as `required` for a request naming no `MetadataOptions` - so the naive
+   reading overstated the gap.
 
-   **A docstring was not enough.** That remedy was applied here and the defect
-   survived it: the docstring said the clean scan did not cover the launch-time
-   statement, while the tool went on printing `100.0% - safe to deploy at root
-   level` for a fleet made entirely of IMDSv1 instances. Prose in a file the
-   operator is not reading does not correct a number the operator is reading.
-   A gap the scan cannot close has to change the verdict, or stop being part
-   of what the verdict licenses. See AP-011.
+   Two follow-ons, both learned the hard way here:
 
-   **And check whether the gap is real before designing around it.** "The scan
-   cannot observe a request in flight" was true and led straight to a wrong
-   conclusion, because an observable thing stood in for it: the request's tags
-   land on the resource it creates. A key you cannot read directly may still
-   have a proxy. Name the proxy, argue for it, measure it - AP-011 habit 3.
+   - **A docstring is not a remedy.** The docstring said the clean scan did not
+     cover the launch-time statement while the tool went on printing
+     `100.0% - safe to deploy at root level` for a fleet made entirely of
+     IMDSv1 instances. Prose in a file the operator is not reading does not
+     correct a number the operator is reading. A gap the scan cannot close has
+     to change the verdict, or stop being part of what the verdict licenses.
+     See AP-011 and
+     [INV-10](spec/invariants.md#inv-10--one-verdict-gates-one-statement).
+   - **Check whether the gap is real before designing around it.** "The scan
+     cannot observe a request in flight" was true and led straight to a wrong
+     conclusion, because an observable thing stood in for it: the request's
+     tags land on the resource it creates. A key you cannot read directly may
+     still have a proxy. Name the proxy, argue for it in the check's
+     specification, measure it - AP-011 habit 3.
 
    None of this is settleable from documentation. AWS's own guide says
    `HttpTokens` requires `HttpEndpoint=enabled`; `RunInstances` accepts the
@@ -889,21 +893,16 @@ evaluates. Three ways they drift apart, all observed in this repo:
    generated policy, prove it with `run-instances --dry-run` under a throwaway
    role carrying the statement, with a control request that must be denied so a
    broken probe cannot pass as a clean result.
-4. **One key read two ways.** Every condition key a statement adds is a key
-   the scanner has to mirror, and a second key is where the two drift. Both
-   IMDS statements were briefly built around a `ec2:MetadataHttpEndpoint`
-   clause, on the theory that a launch disabling IMDS must stay possible; the
-   hop-limit statement never carried it, so the pair disagreed about the same
-   fleet. Dropping it left one key, `HttpTokens`, deciding in both the policy
-   and the check. Prefer the narrower statement whose extra permission the
-   operator can buy back for free - here, naming `HttpTokens=required` on a
-   launch with no metadata service, which changes no behaviour.
 
-Before writing the analyzer, read the statement and list every condition key
-in it. For each one, name what the scanner will read to model it. A key with
-no answer is a gap to document, not to approximate.
-
----
+4. **One key read two ways.** Every condition key a statement adds is a key the
+   scanner has to mirror, and a second key is where the two drift. Both IMDS
+   statements were briefly built around an `ec2:MetadataHttpEndpoint` clause,
+   on the theory that a launch disabling IMDS must stay possible; the hop-limit
+   statement never carried it, so the pair disagreed about the same fleet.
+   Dropping it left one key, `HttpTokens`, deciding in both the policy and the
+   check. Prefer the narrower statement whose extra permission the operator can
+   buy back for free - here, naming `HttpTokens=required` on a launch with no
+   metadata service, which changes no behaviour.
 
 ### AP-010: Judging a Target by Part of What It Governs
 
@@ -1168,7 +1167,10 @@ if_check_has_exemptions:
     must_read: |
       The dimension the condition key reads, not a same-named tag on a
       convenient object. aws:PrincipalTag reads the calling role's tags;
-      aws:RequestTag reads the create request's; neither reads the resource's.
+      aws:RequestTag reads the create request's. Neither is the resource's own
+      tag. Substituting one is allowed only where you can argue the proxy is
+      exact and write that argument into the check's specification, as
+      spec/checks/scps/deny_ec2_imds_v1.md does. See INV-09.
 
   - path: headroom/constants.py
     add_lines: |
@@ -1176,11 +1178,12 @@ if_check_has_exemptions:
       operator that compares them. StringNotEquals is case-sensitive, so the
       scanner must not lowercase what enforcement will not.
 
-  - path: headroom/checks/{type}/{check_name}.py
-    docstring: |
-      State which statements a clean scan clears and which it cannot. An
-      exemption the scan cannot observe - a launch-request tag, say - belongs
-      in the docstring, not in an implied guarantee.
+  - path: spec/checks/{type}/{check_name}.md
+    must_state: |
+      Which statements a clean scan clears and which it cannot, in the
+      accepted-limitations section. A gap the scan cannot close changes the
+      verdict or leaves the statement ungenerated; it is never carried by
+      prose alone. See AP-009 habit 3.
 
   - path: tests/test_aws_{service}.py
     must_test: [right_dimension_exempts, wrong_dimension_does_not, value_case_is_exact]
@@ -1487,7 +1490,7 @@ step_1_gather_requirements:
     - check_name: "deny_{service}_{descriptor}"
     - check_type: "SCP or RCP"
     - aws_service: "ec2, rds, s3, iam, etc."
-    - pattern: "1-6 from POLICY_TAXONOMY.md"
+    - pattern: "1-6 from spec/contracts/policy-model.md"
     - api_calls: ["list operation", "describe operation"]
     - condition_keys: "From AWS Service Authorization Reference"
 
@@ -1635,9 +1638,15 @@ constants:
   format: "UPPER_SNAKE_CASE"
 
 policy_patterns:
-  file: documentation/POLICY_TAXONOMY.md
+  file: spec/contracts/policy-model.md
   use: "Determine which pattern (1-6) applies"
   examples: "See existing checks as pattern examples"
+
+specification:
+  manifest: spec/README.md
+  invariants: spec/invariants.md
+  per_check: "spec/checks/scps/{check_name}.md or spec/checks/rcps/{check_name}.md"
+  enforced_by: tests/test_spec_corpus.py
 ```
 
 ---
@@ -1653,6 +1662,7 @@ before_completion:
     - tox_passes: "tox"
 
   files_created:
+    - spec/checks/{type}/{check_name}.md: "Written first, before any code"
     - headroom/constants.py: "Added constant"
     - headroom/aws/{service}.py: "Created or updated"
     - headroom/checks/{type}/{check_name}.py: "Created with @register_check"
@@ -1665,6 +1675,7 @@ before_completion:
     - headroom/terraform/generate_{type}.py: "Added generation logic"
 
   verification:
+    - specification_valid: "pytest tests/test_spec_corpus.py"
     - check_registered: "Appears in get_check_names()"
     - terraform_validates: "terraform validate passes"
     - no_lint_errors: "No flake8 errors"
@@ -1682,6 +1693,6 @@ before_completion:
 
 For questions, reference:
 - Existing checks in `headroom/checks/scps/` and `headroom/checks/rcps/`
-- `documentation/POLICY_TAXONOMY.md` for policy patterns
+- `spec/contracts/policy-model.md` for policy patterns, and `spec/README.md` for which specification owns what
 - `headroom/checks/base.py` for BaseCheck interface
 - Test files in `tests/` for test examples

@@ -84,6 +84,9 @@ Deliberately **outside** the corpus, and never normative:
 
 Match the longest path prefix. Always load this manifest and
 [`invariants.md`](invariants.md); load the rest only as the table directs.
+[`../.cursor/rules/`](../.cursor/rules) encodes this table as glob-scoped rules
+for editors that apply them automatically. This table is the source; those rules
+are derived from it and are updated with it.
 
 | Touched path | Also read |
 |---|---|
