@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -41,18 +41,6 @@ CONFLICT_STATUS = "Status: unresolved"
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _INVARIANT_HEADING = re.compile(r"^## (INV-\d+)\b", re.MULTILINE)
 _SECTION_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
-
-# The manifest's routing table, and the .cursor/rules/*.mdc derived from it.
-# The section is sliced out by heading first, so a row is only ever read from
-# the one table that governs routing.
-ROUTING_HEADING = "## Routing"
-_ROUTING_SECTION = re.compile(
-    rf"^{ROUTING_HEADING}.*?$(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL
-)
-_TABLE_ROW = re.compile(r"^\|\s*`([^`]+)`[^|]*\|(.+?)\|\s*$", re.MULTILINE)
-_INLINE_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-_RULE_GLOBS = re.compile(r"^globs:\s*(.+)$", re.MULTILINE)
-_SPEC_LINK_PREFIX = "mdc:spec/"
 
 
 @dataclass(frozen=True)
@@ -273,90 +261,3 @@ def find_corpus_problems(spec_root: Path, check_types: Dict[str, str]) -> List[s
         problems.append(f"registered check {check_name} has no specification")
 
     return sorted(problems)
-
-
-def _routing_table(spec_readme: Path) -> Dict[str, Set[str]]:
-    """
-    Read the manifest's routing table as touched path -> required documents.
-
-    Args:
-        spec_readme: The spec/README.md holding the table
-
-    Returns:
-        Each row's first backticked path, mapped to the spec-relative documents
-        its second column links
-    """
-    section = _ROUTING_SECTION.search(spec_readme.read_text())
-    if not section:
-        raise ValueError(f"{spec_readme} has no '{ROUTING_HEADING}' section")
-
-    return {
-        touched: {
-            target for target in _INLINE_LINK.findall(required)
-            if target.endswith(".md")
-        }
-        for touched, required in _TABLE_ROW.findall(section.group(1))
-    }
-
-
-def _rule_globs_and_documents(rule: Path) -> Tuple[List[str], Set[str]]:
-    """
-    Read one .mdc rule's globs and the specification documents it links.
-
-    Args:
-        rule: The .cursor/rules/*.mdc file
-
-    Returns:
-        Its glob patterns, and the spec-relative documents it links
-    """
-    text = rule.read_text()
-    globs: List[str] = []
-
-    match = _RULE_GLOBS.search(text)
-    if match:
-        globs = [glob.strip() for glob in match.group(1).split(",") if glob.strip()]
-
-    documents = {
-        target[len(_SPEC_LINK_PREFIX):]
-        for target in _INLINE_LINK.findall(text)
-        if target.startswith(_SPEC_LINK_PREFIX)
-    }
-
-    return globs, documents
-
-
-def find_routing_divergences(repository_root: Path) -> List[str]:
-    """
-    Report every routing-table row the rules that cover it do not fully serve.
-
-    spec/README.md declares the rules derived from its routing table. An editor
-    applies every rule whose globs match the file being edited, so the union of
-    those rules is what has to satisfy the row - a single rule may name less.
-
-    Args:
-        repository_root: The repository root, holding spec/ and .cursor/rules/
-
-    Returns:
-        Problem descriptions, sorted
-    """
-    table = _routing_table(repository_root / "spec" / "README.md")
-
-    covering: Dict[str, Set[str]] = {touched: set() for touched in table}
-    rule_names: Dict[str, List[str]] = {touched: [] for touched in table}
-
-    for rule in sorted((repository_root / ".cursor" / "rules").glob("*.mdc")):
-        globs, linked = _rule_globs_and_documents(rule)
-        for touched in table:
-            if any(glob.startswith(touched) for glob in globs):
-                covering[touched] |= linked
-                rule_names[touched].append(rule.name)
-
-    divergences: List[str] = []
-    for touched, required in table.items():
-        if not rule_names[touched]:
-            continue
-        for document in sorted(required - covering[touched]):
-            names = ", ".join(rule_names[touched])
-            divergences.append(f"{names} cover {touched} but omit {document}")
-
-    return sorted(divergences)

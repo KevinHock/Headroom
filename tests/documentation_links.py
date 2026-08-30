@@ -10,17 +10,12 @@ _HEADING = re.compile(r"^#{1,6}[ \t]+(.+?)[ \t]*#*$", re.MULTILINE)
 _FENCE = re.compile(r"^(?:```|~~~).*?^(?:```|~~~)", re.MULTILINE | re.DOTALL)
 _NOT_SLUG = re.compile(r"[^\w\- ]", re.UNICODE)
 
-# Cursor writes intra-repository links in its rule files as mdc:<path>, always
-# relative to the repository root. The prefix reads as a URL scheme, so it has
-# to be recognized before the scheme test rather than after it.
-_CURSOR_PREFIX = "mdc:"
-
-_MARKDOWN_SUFFIXES = frozenset({".md", ".mdc"})
+_MARKDOWN_SUFFIX = ".md"
 
 # Directories holding third-party or generated Markdown. .tox alone carries a
 # site-packages tree of it. Named rather than matched on a leading dot, so that
-# .cursor/ - repository documentation that happens to live in a tool directory -
-# is still checked.
+# a dot directory holding repository documentation - `.github/`, for one - is
+# still checked.
 _UNCHECKED_DIRECTORIES = frozenset({
     ".git",
     ".mypy_cache",
@@ -80,7 +75,7 @@ def find_broken_links(root: Path) -> List[str]:
     anchor_cache: Dict[Path, Set[str]] = {}
 
     for markdown_file in sorted(root.rglob("*")):
-        if markdown_file.suffix not in _MARKDOWN_SUFFIXES:
+        if markdown_file.suffix != _MARKDOWN_SUFFIX:
             continue
 
         if not _UNCHECKED_DIRECTORIES.isdisjoint(markdown_file.relative_to(root).parts):
@@ -88,23 +83,17 @@ def find_broken_links(root: Path) -> List[str]:
 
         targets: List[str] = _INLINE_LINK.findall(markdown_file.read_text())
         for target in targets:
-            if target.startswith(_CURSOR_PREFIX):
-                base = root
-                reference = target[len(_CURSOR_PREFIX):]
-            elif _HAS_SCHEME.match(target):
+            if _HAS_SCHEME.match(target):
                 continue
-            else:
-                base = markdown_file.parent
-                reference = target
 
-            path, _, anchor = reference.partition("#")
-            resolved = markdown_file if not path else base / path
+            path, _, anchor = target.partition("#")
+            resolved = markdown_file if not path else markdown_file.parent / path
 
             if not resolved.exists():
                 broken.append(f"{markdown_file.relative_to(root)} -> {target}")
                 continue
 
-            if not anchor or resolved.suffix not in _MARKDOWN_SUFFIXES:
+            if not anchor or resolved.suffix != _MARKDOWN_SUFFIX:
                 continue
 
             if _slug(anchor) not in _anchors(resolved, anchor_cache):

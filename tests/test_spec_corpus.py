@@ -8,9 +8,7 @@ from headroom.checks.registry import get_check_type_map
 from tests.documentation_links import find_broken_links
 from tests.spec_corpus import (
     REQUIRED_FIELDS,
-    ROUTING_HEADING,
     find_corpus_problems,
-    find_routing_divergences,
     invariant_ids,
     load_check_specifications,
     parse_frontmatter,
@@ -298,84 +296,3 @@ class TestMalformedFrontmatterValues:
         assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
             "deny_ec2_public_ip.md verification must be a list, not a NoneType"
         ]
-
-
-class TestRoutingRulesTrackTheTable:
-    """
-    .cursor/rules/ claims to be derived from the manifest's routing table.
-
-    spec/README.md says so in as many words, and the two had already diverged
-    twice by the time anyone checked. A rule that names fewer documents than
-    the table sends an agent into a change without the contract that governs it.
-    """
-
-    def test_every_rule_covers_what_the_table_requires(self) -> None:
-        assert find_routing_divergences(REPOSITORY_ROOT) == []
-
-    def test_a_rule_missing_a_required_document_is_reported(self, tmp_path: Path) -> None:
-        (tmp_path / "spec").mkdir()
-        (tmp_path / "spec" / "README.md").write_text(
-            "## Routing: what to read for the path you are touching\n\n"
-            "| Touched path | Also read |\n"
-            "|---|---|\n"
-            "| `headroom/terraform/` | [x](contracts/terraform.md), [y](contracts/placement.md) |\n"
-        )
-        rules = tmp_path / ".cursor" / "rules"
-        rules.mkdir(parents=True)
-        (rules / "030.mdc").write_text(
-            "---\nglobs: headroom/terraform/**/*.py\n---\n\n"
-            "[t](mdc:spec/contracts/terraform.md)\n"
-        )
-
-        assert find_routing_divergences(tmp_path) == [
-            "030.mdc cover headroom/terraform/ but omit contracts/placement.md"
-        ]
-
-    def test_two_rules_covering_one_row_satisfy_it_together(self, tmp_path: Path) -> None:
-        """An editor applies every matching rule, so their union is what counts."""
-        (tmp_path / "spec").mkdir()
-        (tmp_path / "spec" / "README.md").write_text(
-            "## Routing: what to read for the path you are touching\n\n"
-            "| Touched path | Also read |\n"
-            "|---|---|\n"
-            "| `headroom/terraform/` | [x](contracts/terraform.md), [y](contracts/placement.md) |\n"
-        )
-        rules = tmp_path / ".cursor" / "rules"
-        rules.mkdir(parents=True)
-        (rules / "030.mdc").write_text(
-            "---\nglobs: headroom/terraform/**/*.py\n---\n\n"
-            "[t](mdc:spec/contracts/terraform.md)\n"
-        )
-        (rules / "040.mdc").write_text(
-            "---\nglobs: headroom/terraform/generate_scps.py\n---\n\n"
-            "[p](mdc:spec/contracts/placement.md)\n"
-        )
-
-        assert find_routing_divergences(tmp_path) == []
-
-    def test_a_rule_may_name_more_than_the_table_requires(self, tmp_path: Path) -> None:
-        (tmp_path / "spec").mkdir()
-        (tmp_path / "spec" / "README.md").write_text(
-            "## Routing: what to read for the path you are touching\n\n"
-            "| Touched path | Also read |\n"
-            "|---|---|\n"
-            "| `headroom/terraform/` | [x](contracts/terraform.md) |\n"
-        )
-        rules = tmp_path / ".cursor" / "rules"
-        rules.mkdir(parents=True)
-        (rules / "030.mdc").write_text(
-            "---\nglobs: headroom/terraform/**/*.py\n---\n\n"
-            "[t](mdc:spec/contracts/terraform.md)\n"
-            "[p](mdc:spec/contracts/placement.md)\n"
-        )
-
-        assert find_routing_divergences(tmp_path) == []
-
-    def test_a_manifest_with_no_routing_section_raises(self, tmp_path: Path) -> None:
-        """The table is the source; its absence is a broken corpus, not zero rows."""
-        (tmp_path / "spec").mkdir()
-        (tmp_path / "spec" / "README.md").write_text("# Manifest\n\n## Glossary\n")
-        (tmp_path / ".cursor" / "rules").mkdir(parents=True)
-
-        with pytest.raises(ValueError, match=ROUTING_HEADING):
-            find_routing_divergences(tmp_path)

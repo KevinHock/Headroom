@@ -57,37 +57,13 @@ def test_every_relative_link_in_the_repository_resolves() -> None:
 
 
 def test_checks_markdown_in_dot_directories_that_are_not_tool_output(tmp_path: Path) -> None:
-    cursor = tmp_path / ".cursor"
-    cursor.mkdir()
-    (cursor / "mental_model.md").write_text("[the guide](../CLAUDE.md)\n")
+    github = tmp_path / ".github"
+    github.mkdir()
+    (github / "PULL_REQUEST_TEMPLATE.md").write_text("[the guide](../CLAUDE.md)\n")
 
-    assert find_broken_links(tmp_path) == [".cursor/mental_model.md -> ../CLAUDE.md"]
-
-
-def test_reports_a_broken_mdc_link_in_a_cursor_rule(tmp_path: Path) -> None:
-    """
-    .cursor/rules/*.mdc route agents by path and must not point at nothing.
-
-    Cursor writes its intra-repository links as mdc:<path>, which reads as a
-    URL scheme, and the files carry a .mdc extension rather than .md. Both
-    would exempt them from an unmodified scan.
-    """
-    rules = tmp_path / ".cursor" / "rules"
-    rules.mkdir(parents=True)
-    (rules / "010-checks.mdc").write_text("Read [the manifest](mdc:spec/README.md).\n")
-
-    assert find_broken_links(tmp_path) == [".cursor/rules/010-checks.mdc -> mdc:spec/README.md"]
-
-
-def test_resolves_an_mdc_link_from_the_repository_root(tmp_path: Path) -> None:
-    """An mdc: target is repository-relative, not relative to the rule file."""
-    rules = tmp_path / ".cursor" / "rules"
-    rules.mkdir(parents=True)
-    (rules / "010-checks.mdc").write_text("Read [the manifest](mdc:spec/README.md).\n")
-    (tmp_path / "spec").mkdir()
-    (tmp_path / "spec" / "README.md").write_text("# Manifest\n")
-
-    assert find_broken_links(tmp_path) == []
+    assert find_broken_links(tmp_path) == [
+        ".github/PULL_REQUEST_TEMPLATE.md -> ../CLAUDE.md"
+    ]
 
 
 def test_reports_an_anchor_that_no_heading_defines(tmp_path: Path) -> None:

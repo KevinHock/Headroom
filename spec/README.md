@@ -79,33 +79,18 @@ Deliberately **outside** the corpus, and never normative:
 | [`../test_environment/README.md`](../test_environment/README.md) | Live-test topology, execution, cost, cleanup |
 | [`../ROADMAP.md`](../ROADMAP.md) | Future work |
 | [`../HOW_TO_ADD_A_CHECK.md`](../HOW_TO_ADD_A_CHECK.md) | Authoring runbook for a new check |
+| [`../CLAUDE.md`](../CLAUDE.md) | How to work here: truth hierarchy, routing by touched path, what counts as done |
 
-## Routing: what to read for the path you are touching
+## Routing
 
-Match the longest path prefix. Always load this manifest and
-[`invariants.md`](invariants.md); load the rest only as the table directs.
-[`../.cursor/rules/`](../.cursor/rules) encodes this table as glob-scoped rules
-for editors that apply them automatically. This table is the source; those rules
-are derived from it and are updated with it.
+Routing from a touched path to the documents that govern it lives in
+[`../CLAUDE.md`](../CLAUDE.md#routes), as one table that also names the
+implementation files and tests the same change must open. It sits there rather
+than here because it is navigation, not normative behavior, and because an agent
+has `CLAUDE.md` loaded already.
 
-| Touched path | Also read |
-|---|---|
-| `headroom/checks/scps/<name>.py` | [`checks/scps/<name>.md`](checks/scps/), [`architecture/check-framework.md`](architecture/check-framework.md) |
-| `headroom/checks/rcps/<name>.py` | [`checks/rcps/<name>.md`](checks/rcps/), [`architecture/check-framework.md`](architecture/check-framework.md), [`contracts/policy-model.md`](contracts/policy-model.md) |
-| `headroom/checks/base.py`, `headroom/checks/registry.py` | [`architecture/check-framework.md`](architecture/check-framework.md), [`contracts/results.md`](contracts/results.md) |
-| `headroom/aws/policy_documents.py` | [`contracts/policy-model.md`](contracts/policy-model.md), every `checks/rcps/*.md` |
-| `headroom/aws/organization.py`, `headroom/analysis.py` | [`architecture/aws-execution.md`](architecture/aws-execution.md), [`contracts/placement.md`](contracts/placement.md) |
-| `headroom/aws/sessions.py`, `headroom/aws/helpers.py` | [`architecture/aws-execution.md`](architecture/aws-execution.md) |
-| `headroom/aws/<service>.py` | the `checks/*` documents naming that service, [`contracts/policy-model.md`](contracts/policy-model.md) |
-| `headroom/write_results.py`, `headroom/parse_results.py` | [`contracts/results.md`](contracts/results.md), [`contracts/placement.md`](contracts/placement.md) |
-| `headroom/placement/` | [`contracts/placement.md`](contracts/placement.md) |
-| `headroom/terraform/` | [`contracts/terraform.md`](contracts/terraform.md), [`contracts/placement.md`](contracts/placement.md) |
-| `headroom/config.py`, `headroom/usage.py`, `sample_config.yaml` | [`contracts/configuration.md`](contracts/configuration.md) |
-| `headroom/main.py` | [`architecture/overview.md`](architecture/overview.md) for the stage order, and [`contracts/terraform.md`](contracts/terraform.md) for `ensure_org_info_symlink` |
-| `headroom/constants.py`, `headroom/enums.py`, `headroom/types.py`, `headroom/utils.py`, `headroom/output.py` | Whichever contract owns the value you are changing. These modules hold no behavior of their own; a constant is normative wherever it is consumed. |
-| `test_environment/modules/` | [`contracts/terraform.md`](contracts/terraform.md), [`contracts/policy-model.md`](contracts/policy-model.md), the affected `checks/*` documents |
-| `tests/` | [`verification/strategy.md`](verification/strategy.md) |
-| `spec/checks/` | [`checks/index.md`](checks/index.md) and `tests/test_spec_corpus.py` |
+Always load this manifest and [`invariants.md`](invariants.md), whatever you are
+touching.
 
 ## Glossary
 

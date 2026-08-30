@@ -32,22 +32,39 @@ These are global invariants; [`spec/invariants.md`](spec/invariants.md) states e
 
 ## Routes
 
-Two routing tables, used together.
+Match the longest path prefix. Always load [`spec/README.md`](spec/README.md) and
+[`spec/invariants.md`](spec/invariants.md), whatever you are touching; load the
+rest only as this table directs. Specification paths are shown relative to
+`spec/`.
 
-1. **Which specifications govern the file you are touching** → the routing table in [`spec/README.md`](spec/README.md#routing-what-to-read-for-the-path-you-are-touching). Always load that manifest and `spec/invariants.md`; load the rest by longest matching path prefix. [`.cursor/rules/`](.cursor/rules) encodes the same routing as glob-scoped rules for editors that apply them automatically; the table is the source, the rules are derived.
-2. **Which implementation files and tests a change must open** → below. Read the branch that matches your change and skip the rest.
-
-- **Adding or changing a check, or registry discovery** → [`HOW_TO_ADD_A_CHECK.md`](HOW_TO_ADD_A_CHECK.md), `headroom/checks/registry.py`, and `tests/test_checks_registry.py`. Collection, writing, parsing, and placement need no edit — they read the registry. Terraform generation does: a new RCP check must be named in `RCP_TERRAFORM_VARIABLES`, and a new SCP check must be rendered by `_build_scp_terraform_module`. `test_table_covers_every_registered_rcp_check` in `tests/test_generate_rcps.py` and `test_every_registered_scp_check_is_rendered` in `tests/test_generate_scps.py` fail by name when you forget. A new check also needs its specification under `spec/checks/`, which `tests/test_spec_corpus.py` enforces.
-- **Principal, action, wildcard, or statement interpretation** → `headroom/aws/policy_documents.py` plus every service adapter that reads policy documents: `headroom/aws/ecr.py`, `kms.py`, `s3.py`, `secretsmanager.py`, `sqs.py`, and `iam/roles.py`. A change to how a statement is read is a change to all of them.
-- **Generated paths, symlinks, ownership markers, or reconciliation** → [`spec/contracts/terraform.md`](spec/contracts/terraform.md), then `headroom/terraform/reconcile.py`, `ensure_org_info_symlink` in `headroom/main.py`, and `tests/test_terraform_reconcile.py`.
-- **Result JSON schemas, filenames, resume behavior, or cache detection** → [`spec/contracts/results.md`](spec/contracts/results.md), the writer `headroom/write_results.py`, its one call site `BaseCheck.execute` in `headroom/checks/base.py`, and both readers, `headroom/parse_results.py` for SCPs and `headroom/terraform/generate_rcps.py` for RCPs. A filename change can silently re-scan or silently skip accounts without any reader failing. Tests: `tests/test_write_results.py`, `tests/test_parse_results.py`, and `TestRunChecks` in `tests/test_analysis_extended.py`.
-- **Account enumeration or hierarchy behavior** → `headroom/analysis.py` and `headroom/aws/organization.py`, keeping INV-04's three projections distinct, with `tests/test_placement_hierarchy.py` and `tests/test_nested_ou_hierarchy.py`.
-- **Public CLI options or configuration** → `headroom/usage.py`, `headroom/config.py`, and `sample_config.yaml`, then `README.md` and `documentation/SETUP.md`, with `tests/test_config.py` and `tests/test_main.py`.
-- **Documentation prose with no behavior change** → edit the file; no implementation file is implicated. `tests/test_documentation_links.py` fails on a relative link whose target is missing and `tests/test_spec_corpus.py` fails on a malformed or missing check specification, so run those two in place of `tox`.
+| Touched path | Specifications | Also open |
+|---|---|---|
+| `headroom/checks/scps/<name>.py` | [`checks/scps/<name>.md`](spec/checks/scps/), [`architecture/check-framework.md`](spec/architecture/check-framework.md) | That specification's own `applies_to` and `verification`. A **new** check also needs [`HOW_TO_ADD_A_CHECK.md`](HOW_TO_ADD_A_CHECK.md) and a case in `_build_scp_terraform_module`; `test_every_registered_scp_check_is_rendered` fails by name when you forget. |
+| `headroom/checks/rcps/<name>.py` | [`checks/rcps/<name>.md`](spec/checks/rcps/), [`architecture/check-framework.md`](spec/architecture/check-framework.md), [`contracts/policy-model.md`](spec/contracts/policy-model.md) | As above. A **new** check must be named in `RCP_TERRAFORM_VARIABLES`; `test_table_covers_every_registered_rcp_check` fails by name. |
+| `headroom/checks/base.py`, `headroom/checks/registry.py` | [`architecture/check-framework.md`](spec/architecture/check-framework.md), [`contracts/results.md`](spec/contracts/results.md) | `headroom/write_results.py` - `BaseCheck.execute` is its one call site. `tests/test_checks_registry.py`. |
+| `headroom/aws/policy_documents.py` | [`contracts/policy-model.md`](spec/contracts/policy-model.md), every `checks/rcps/*.md` | Every adapter that reads a statement: `headroom/aws/ecr.py`, `kms.py`, `s3.py`, `secretsmanager.py`, `sqs.py`, `iam/roles.py`. A change to how a statement is read is a change to all six. |
+| `headroom/aws/<service>.py` | the `checks/*` documents naming that service, [`contracts/policy-model.md`](spec/contracts/policy-model.md) | `headroom/aws/policy_documents.py`, if statement interpretation moves. |
+| `headroom/aws/organization.py`, `headroom/analysis.py` | [`architecture/aws-execution.md`](spec/architecture/aws-execution.md), [`contracts/placement.md`](spec/contracts/placement.md) | Keep INV-04's three projections distinct. `tests/test_placement_hierarchy.py`, `tests/test_nested_ou_hierarchy.py`. |
+| `headroom/aws/sessions.py`, `headroom/aws/helpers.py` | [`architecture/aws-execution.md`](spec/architecture/aws-execution.md) | - |
+| `headroom/write_results.py`, `headroom/parse_results.py` | [`contracts/results.md`](spec/contracts/results.md), [`contracts/placement.md`](spec/contracts/placement.md) | Both readers: `parse_results.py` for SCPs, `headroom/terraform/generate_rcps.py` for RCPs. A filename change can silently re-scan or silently skip accounts without any reader failing. `tests/test_write_results.py`, `tests/test_parse_results.py`, `TestRunChecks` in `tests/test_analysis_extended.py`. |
+| `headroom/placement/` | [`contracts/placement.md`](spec/contracts/placement.md) | - |
+| `headroom/terraform/` | [`contracts/terraform.md`](spec/contracts/terraform.md), [`contracts/placement.md`](spec/contracts/placement.md) | `reconcile.py`, and `ensure_org_info_symlink` in `headroom/main.py`. `tests/test_terraform_reconcile.py`. |
+| `headroom/config.py`, `headroom/usage.py`, `sample_config.yaml` | [`contracts/configuration.md`](spec/contracts/configuration.md) | `README.md` and [`documentation/SETUP.md`](documentation/SETUP.md). `tests/test_config.py`, `tests/test_main.py`. |
+| `headroom/main.py` | [`architecture/overview.md`](spec/architecture/overview.md) for the stage order, [`contracts/terraform.md`](spec/contracts/terraform.md) for `ensure_org_info_symlink` | - |
+| `headroom/constants.py`, `headroom/enums.py`, `headroom/types.py`, `headroom/utils.py`, `headroom/output.py` | Whichever contract owns the value you are changing | The consumer. These modules hold no behavior of their own; a constant is normative wherever it is consumed. |
+| `test_environment/modules/` | [`contracts/terraform.md`](spec/contracts/terraform.md), [`contracts/policy-model.md`](spec/contracts/policy-model.md), the affected `checks/*` documents | - |
+| `tests/` | [`verification/strategy.md`](spec/verification/strategy.md) | - |
+| `spec/checks/` | [`checks/index.md`](spec/checks/index.md) | `tests/test_spec_corpus.py` for what is mechanically enforced. |
+| Prose in any `.md`, with no behavior change | The owner named in [`spec/README.md`](spec/README.md) | No implementation file is implicated. `tests/test_documentation_links.py` fails on a relative link whose target is missing, and `tests/test_spec_corpus.py` on a malformed or missing check specification; run those two in place of `tox`. |
 
 ## Conventions
 
-[`.cursorrules`](.cursorrules) is authoritative for code conventions. It carries the fail-fast rules, the single-source-of-defaults rule for CLI and config values, and the import rules including the check-discovery exception above.
+[`CONVENTIONS.md`](CONVENTIONS.md) is authoritative for code conventions, and is
+imported below so that it loads with this file. It carries the fail-fast rules,
+the single-source-of-defaults rule for CLI and config values, and the import
+rules including the check-discovery exception above.
+
+@CONVENTIONS.md
 
 ## Completion
 
