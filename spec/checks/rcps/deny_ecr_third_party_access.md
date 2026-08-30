@@ -70,7 +70,7 @@ Permitted principal types are `AWS` and `Service`.
 
 | Situation | Behavior |
 |---|---|
-| `RepositoryPolicyNotFoundException` | The repository grants nothing; recorded with no third parties and no wildcard |
+| `RepositoryPolicyNotFoundException` | The repository is skipped; it grants nothing. Only a repository with a third-party account or a wildcard reaches the results list |
 | Any other `ClientError` on one repository | Re-raised, aborting the run |
 | `ClientError` in any region | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |

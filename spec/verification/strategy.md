@@ -12,8 +12,14 @@ step must pass:
 | Step | Requirement |
 |---|---|
 | `pytest tests/` | Every test passes |
-| Coverage of `headroom/` | **100%**, no exclusions beyond `__main__.py` |
+| Coverage of `headroom/` | **100%**. `.coveragerc` omits `*/__main__.py`, and `.tox/*` and `setup.py`, which are not source |
 | Coverage of `tests/` | **100%** — the test suite must exercise its own helpers |
+
+`.coveragerc` also excludes any line marked `pragma: no cover`. One line carries
+it today, an unreachable fallback in a test double
+(`tests/test_analysis_extended.py`). It is an escape hatch, not a budget: a new
+one in `headroom/` needs a reason in review, because the 100% figure is only
+worth what the exclusions leave in.
 | `mypy headroom/ tests/` | Clean, under a strict configuration |
 | `pre-commit run --all-files` | End-of-file, trailing whitespace, autoflake, flake8, autopep8 |
 
@@ -63,13 +69,16 @@ subdirectories and no shared fixture package.
 | `tests/test_spec_corpus.py` | this corpus against the registry |
 | `tests/test_documentation_links.py` | relative Markdown links resolve |
 
-Two files hold cross-module tests deliberately, because the bug they exist to
-catch only appears when two modules are generated from one input:
+Three files depart from that, deliberately:
 
 - `tests/test_nested_ou_hierarchy.py` — generates org info and policies from one
   hierarchy and asserts every `local.` a policy reads is one the org info
-  declares (INV-12).
+  declares (INV-12). Cross-module by construction: the bug only appears when two
+  modules are generated from one input.
 - `tests/test_main_integration.py` — the pipeline end to end against fakes.
+- `tests/test_analysis_extended.py` — a second file over `headroom/analysis.py`,
+  holding the account-enumeration and resume paths. It is a size split rather
+  than a boundary, and the two would be better merged than imitated.
 
 ## Named guard tests
 

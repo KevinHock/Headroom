@@ -78,7 +78,7 @@ in-organization principal and so is never recorded.
 
 | Situation | Behavior |
 |---|---|
-| `NotFoundException` on one key | The key grants nothing; recorded with no third parties and no wildcard |
+| `NotFoundException` on one key | The key is skipped; it grants nothing. Only a key with a third-party account or a wildcard reaches the results list |
 | Any other `ClientError` on one key | Re-raised, aborting the run |
 | `ClientError` in any region | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |

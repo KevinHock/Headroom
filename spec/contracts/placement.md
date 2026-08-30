@@ -65,8 +65,11 @@ cannot break.
 If no account has zero violations, the check yields exactly one `none`
 recommendation and generates no Terraform for that check.
 
-`compliance_percentage` on a recommendation is `100.0` at every level, because
-`affected_accounts` always holds the zero-violation subset. It is not a coverage
+`compliance_percentage` on a recommendation is `100.0` at every level that
+places a policy, because `affected_accounts` always holds the zero-violation
+subset. The `none` level is the exception and carries `0.0`, with an empty
+`affected_accounts` — there is no subset to be complete about, and nothing reads
+the figure because nothing is generated. It is not a coverage
 figure. It once held the organization-wide coverage fraction for account-level
 recommendations, which generation read as a safety signal — and which account
 placement can never drive to 100% by construction, since the tier only exists

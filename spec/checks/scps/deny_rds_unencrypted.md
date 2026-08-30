@@ -44,8 +44,17 @@ Condition: Bool
              rds:StorageEncrypted = "false"
 ```
 
-Pattern 2, conditional deny. These four actions were confirmed against the AWS
-Service Authorization Reference to support `rds:StorageEncrypted`.
+Pattern 2, conditional deny. Three of the four —
+`rds:CreateDBCluster`, `rds:RestoreDBClusterFromS3`, and
+`rds:CreateBlueGreenDeployment` — are documented in the AWS Service
+Authorization Reference as supporting `rds:StorageEncrypted`.
+
+`rds:CreateDBInstance` is **not**, and is included anyway. The reasoning was
+that an unsupported condition key leaves `Bool` evaluating false, so the `Deny`
+would simply not apply and nothing would break — the attempt was free. It was
+then measured by hand against a live account: the statement does block an
+unencrypted `CreateDBInstance`, so the key is supported and undocumented. The
+Reference is evidence of what AWS has written down, not of what IAM does.
 
 ## Evidence
 

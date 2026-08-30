@@ -5,7 +5,7 @@ per-check specification may narrow one; none may silently override one. A
 deliberate exception is recorded here, at the invariant, and nowhere else.
 
 Each invariant carries a stable ID. Per-check specifications cite these IDs in
-their **Referenced global invariants** section, and
+their **Referenced invariants** section and in `depends_on`, and
 `tests/test_spec_corpus.py` checks that every cited ID exists.
 
 Every invariant here protects the safety promise in

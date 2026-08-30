@@ -119,7 +119,7 @@ Two deliberate exceptions, both narrow:
 
 | Tolerated | Why |
 |---|---|
-| `AccessDenied` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them |
+| Any `ClientError` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them. Wider than intended — see [`../contracts/configuration.md`](../contracts/configuration.md) |
 | Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped |
 
 `main` catches `ValueError`, `RuntimeError`, and `ClientError` at the top level to

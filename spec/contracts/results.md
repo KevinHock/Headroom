@@ -101,11 +101,27 @@ attributed to the wrong policy.
 
 When `exclude_account_ids` is set, before the file is written:
 
-1. Every 12-digit account ID inside an ARN, anywhere in the document, is replaced
-   with `REDACTED`. The match is on the ARN's account field specifically —
-   `arn:aws:<service>:<region>:<account>:` — so an account-shaped number
-   elsewhere in a string survives.
+1. A 12-digit account ID inside an `arn:aws:` ARN, anywhere in the document, is
+   replaced with `REDACTED`. The match is on the ARN's account field
+   specifically — `arn:aws:<service>:<region>:<account>:` — so an account-shaped
+   number elsewhere in a string survives.
 2. `summary.account_id` is removed.
+
+### Known gap: only the `aws` partition is redacted
+
+The pattern matches the literal string `arn:aws:`. An `arn:aws-us-gov:` or
+`arn:aws-cn:` ARN carries its account ID through into the written file, so an
+operator running in GovCloud or China with `exclude_account_ids: true` gets a
+results directory that discloses exactly what the setting exists to withhold —
+and the setting exists so those files can be committed.
+
+Widening the pattern to `arn:aws[a-z0-9-]*:` closes it. That is a one-line
+change, but it changes what a persisted file contains, so an existing GovCloud
+results directory would not match a re-run byte for byte (INV-14).
+
+**Status: unresolved.** Reported rather than fixed. Nothing in
+`test_environment/` exercises a non-commercial partition, so the gap has never
+been observed in this repository — which is why it survived.
 
 Redaction is not reversible in general. SCP parsing restores IAM user ARNs by
 substituting the account ID back in once the account has been identified, because

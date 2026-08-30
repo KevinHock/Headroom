@@ -8,6 +8,8 @@ alwaysApply: false
   registry, the `BaseCheck` template, result categories.
 - [spec/checks/index.md](mdc:spec/checks/index.md) - the inventory, the
   per-check document contract, and the unresolved-conflict table.
+- [spec/contracts/results.md](mdc:spec/contracts/results.md) - for `base.py` and
+  `registry.py`, which decide the shape every check writes.
 - The check's own `spec/checks/scps/<name>.md` or `spec/checks/rcps/<name>.md`.
   An RCP check also needs [spec/contracts/policy-model.md](mdc:spec/contracts/policy-model.md).
 
