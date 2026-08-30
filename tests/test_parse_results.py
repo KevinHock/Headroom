@@ -7,7 +7,7 @@ Tests SCP/RCP compliance results analysis and placement recommendations.
 import json
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
 import pytest
@@ -60,37 +60,133 @@ def make_test_org_hierarchy() -> OrganizationHierarchy:
     )
 
 
+def make_paginated_org_client(
+    ou_calls: List[Any],
+    account_calls: List[Any]
+) -> Mock:
+    """
+    Build a mock Organizations client serving both list operations
+    through paginators.
+
+    One client serves list_organizational_units_for_parent and
+    list_accounts_for_parent, so get_paginator dispatches on the operation
+    name. Each element of a call list holds every page that one call returns,
+    which is what lets a test cover a parent whose children span more than
+    one page.
+
+    Args:
+        ou_calls: Per call to list_organizational_units_for_parent, the pages
+            it yields, or a ClientError for it to raise
+        account_calls: Per call to list_accounts_for_parent, the pages it
+            yields, or a ClientError for it to raise
+
+    Returns:
+        Mock Organizations client
+    """
+    ou_paginator = Mock()
+    ou_paginator.paginate.side_effect = ou_calls
+    account_paginator = Mock()
+    account_paginator.paginate.side_effect = account_calls
+
+    org_client = Mock()
+    org_client.get_paginator.side_effect = {
+        "list_organizational_units_for_parent": ou_paginator,
+        "list_accounts_for_parent": account_paginator,
+    }.__getitem__
+    return org_client
+
+
 class TestOrganizationStructureAnalysis:
     """Test organization structure analysis functions."""
+
+    def test_analyze_organization_structure_pages_through_ou_accounts(self) -> None:
+        """
+        Every account under an OU is recorded, not only the first page.
+
+        ListAccountsForParent caps a page at 20 and AWS documents that it can
+        return fewer even when more remain, so an OU large enough to span
+        pages would otherwise contribute a truncated account list to the
+        hierarchy that placement reads.
+        """
+        mock_session = Mock()
+        mock_org_client = make_paginated_org_client(
+            ou_calls=[
+                [{"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]}],
+                [{"OrganizationalUnits": []}],
+            ],
+            account_calls=[
+                [
+                    {"Accounts": [{"Id": "222222222222", "Name": "prod-account"}]},
+                    {"Accounts": [{"Id": "333333333333", "Name": "prod-account-2"}]},
+                ],
+                [{"Accounts": [{"Id": "111111111111", "Name": "management-account"}]}],
+            ],
+        )
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
+        mock_session.client.return_value = mock_org_client
+
+        result = analyze_organization_structure(mock_session)
+
+        assert result.organizational_units["ou-1234"].accounts == [
+            "222222222222",
+            "333333333333",
+        ]
+        assert "333333333333" in result.accounts
+
+    def test_analyze_organization_structure_records_nested_child_ous(self) -> None:
+        """
+        A parent OU records the child OUs the recursive descent found.
+
+        The walk lists a parent's children once and the recursion hands them
+        back, rather than the parent listing them a second time itself, so a
+        nested OU is the case that proves the returned IDs are wired through.
+        """
+        mock_session = Mock()
+        mock_org_client = make_paginated_org_client(
+            ou_calls=[
+                # Under the root
+                [{"OrganizationalUnits": [{"Id": "ou-1111", "Name": "Parent"}]}],
+                # Under Parent
+                [{"OrganizationalUnits": [{"Id": "ou-2222", "Name": "Child"}]}],
+                # Under Child
+                [{"OrganizationalUnits": []}],
+            ],
+            account_calls=[
+                # Deepest OU first: the descent reaches Child before Parent
+                [{"Accounts": [{"Id": "333333333333", "Name": "child-account"}]}],
+                [{"Accounts": [{"Id": "222222222222", "Name": "parent-account"}]}],
+                [{"Accounts": [{"Id": "111111111111", "Name": "management-account"}]}],
+            ],
+        )
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
+        mock_session.client.return_value = mock_org_client
+
+        result = analyze_organization_structure(mock_session)
+
+        assert result.organizational_units["ou-1111"].child_ous == ["ou-2222"]
+        assert result.organizational_units["ou-2222"].child_ous == []
+        assert result.organizational_units["ou-2222"].parent_ou_id == "ou-1111"
+        assert result.accounts["333333333333"].ou_path == ["Parent", "Child"]
 
     def test_analyze_organization_structure_success(self) -> None:
         """Test successful organization structure analysis."""
         mock_session = Mock()
-        mock_org_client = Mock()
+        mock_org_client = make_paginated_org_client(
+            ou_calls=[
+                # Root level OUs
+                [{"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]}],
+                # Child OUs of Production (empty for simplicity)
+                [{"OrganizationalUnits": []}],
+            ],
+            account_calls=[
+                # Accounts under Production OU
+                [{"Accounts": [{"Id": "222222222222", "Name": "prod-account"}]}],
+                # Accounts directly under root (not in any OU)
+                [{"Accounts": [{"Id": "111111111111", "Name": "management-account"}]}],
+            ],
+        )
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
         mock_session.client.return_value = mock_org_client
-
-        # Mock root response
-        mock_org_client.list_roots.return_value = {
-            "Roots": [{"Id": "r-1234"}]
-        }
-
-        # Mock OU responses
-        mock_org_client.list_organizational_units_for_parent.side_effect = [
-            # Root level OUs
-            {"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]},
-            # Child OUs (empty for simplicity)
-            {"OrganizationalUnits": []},
-            # Child OUs for Production OU (empty)
-            {"OrganizationalUnits": []},
-        ]
-
-        # Mock account responses
-        mock_org_client.list_accounts_for_parent.side_effect = [
-            # Accounts under Production OU
-            {"Accounts": [{"Id": "222222222222", "Name": "prod-account"}]},
-            # Accounts directly under root (not in any OU)
-            {"Accounts": [{"Id": "111111111111", "Name": "management-account"}]},
-        ]
 
         result = analyze_organization_structure(mock_session)
 
@@ -118,24 +214,23 @@ class TestOrganizationStructureAnalysis:
         get_subaccount_information deliberately does not apply here.
         """
         mock_session = Mock()
-        mock_org_client = Mock()
-        mock_session.client.return_value = mock_org_client
-
+        mock_org_client = make_paginated_org_client(
+            ou_calls=[
+                [{"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]}],
+                [{"OrganizationalUnits": []}],
+            ],
+            account_calls=[
+                [{"Accounts": [
+                    {"Id": "222222222222", "Name": "prod-account", "State": "ACTIVE"},
+                    {"Id": "333333333333", "Name": "closed-account", "State": "CLOSED"},
+                ]}],
+                [{"Accounts": [
+                    {"Id": "111111111111", "Name": "management-account", "State": "ACTIVE"},
+                ]}],
+            ],
+        )
         mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
-        mock_org_client.list_organizational_units_for_parent.side_effect = [
-            {"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]},
-            {"OrganizationalUnits": []},
-            {"OrganizationalUnits": []},
-        ]
-        mock_org_client.list_accounts_for_parent.side_effect = [
-            {"Accounts": [
-                {"Id": "222222222222", "Name": "prod-account", "State": "ACTIVE"},
-                {"Id": "333333333333", "Name": "closed-account", "State": "CLOSED"},
-            ]},
-            {"Accounts": [
-                {"Id": "111111111111", "Name": "management-account", "State": "ACTIVE"},
-            ]},
-        ]
+        mock_session.client.return_value = mock_org_client
 
         result = analyze_organization_structure(mock_session)
 
@@ -193,63 +288,46 @@ class TestOrganizationStructureAnalysis:
     def test_analyze_organization_structure_client_error_handling(self) -> None:
         """Test error handling for various AWS client errors."""
         mock_session = Mock()
-        mock_org_client = Mock()
+        mock_org_client = make_paginated_org_client(
+            ou_calls=[
+                # Root level OUs
+                [{"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]}],
+                # Child OUs of Production (empty for simplicity)
+                [{"OrganizationalUnits": []}],
+            ],
+            account_calls=[
+                # First call fails
+                ClientError(
+                    {"Error": {"Code": "AccessDenied", "Message": "Failed to get accounts"}},
+                    "ListAccountsForParent"
+                ),
+                # Second call succeeds
+                [{"Accounts": [{"Id": "111111111111", "Name": "management-account"}]}],
+            ],
+        )
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
         mock_session.client.return_value = mock_org_client
 
-        # Mock root response
-        mock_org_client.list_roots.return_value = {
-            "Roots": [{"Id": "r-1234"}]
-        }
-
-        # Mock OU responses with errors
-        mock_org_client.list_organizational_units_for_parent.side_effect = [
-            # Root level OUs
-            {"OrganizationalUnits": [{"Id": "ou-1234", "Name": "Production"}]},
-            # Child OUs (empty for simplicity)
-            {"OrganizationalUnits": []},
-            # Child OUs for Production OU (empty)
-            {"OrganizationalUnits": []},
-        ]
-
-        # Mock account responses with errors
-        mock_org_client.list_accounts_for_parent.side_effect = [
-            # First call fails
-            ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Failed to get accounts"}},
-                "ListAccountsForParent"
-            ),
-            # Second call succeeds
-            {"Accounts": [{"Id": "111111111111", "Name": "management-account"}]},
-        ]
-
         # Should raise exception on first error
-        with pytest.raises(RuntimeError, match="Failed to get accounts/child OUs for OU ou-1234"):
+        with pytest.raises(RuntimeError, match="Failed to get accounts for OU ou-1234"):
             analyze_organization_structure(mock_session)
 
     def test_analyze_organization_structure_root_accounts_error(self) -> None:
         """Test error handling when getting accounts under root fails."""
         mock_session = Mock()
-        mock_org_client = Mock()
+        mock_org_client = make_paginated_org_client(
+            # Root has no OUs, so the walk lists once and stops
+            ou_calls=[[{"OrganizationalUnits": []}]],
+            account_calls=[
+                # Root accounts call fails
+                ClientError(
+                    {"Error": {"Code": "AccessDenied", "Message": "Failed to get root accounts"}},
+                    "ListAccountsForParent"
+                ),
+            ],
+        )
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
         mock_session.client.return_value = mock_org_client
-
-        # Mock root response
-        mock_org_client.list_roots.return_value = {
-            "Roots": [{"Id": "r-1234"}]
-        }
-
-        # Mock OU responses (empty)
-        mock_org_client.list_organizational_units_for_parent.return_value = {
-            "OrganizationalUnits": []
-        }
-
-        # Mock account responses with error for root accounts
-        mock_org_client.list_accounts_for_parent.side_effect = [
-            # Root accounts call fails
-            ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Failed to get root accounts"}},
-                "ListAccountsForParent"
-            ),
-        ]
 
         # Should raise exception on error
         with pytest.raises(RuntimeError, match="Failed to get accounts under root"):
@@ -258,24 +336,18 @@ class TestOrganizationStructureAnalysis:
     def test_analyze_organization_structure_ou_listing_error(self) -> None:
         """Test error handling when listing OUs fails."""
         mock_session = Mock()
-        mock_org_client = Mock()
-        mock_session.client.return_value = mock_org_client
-
-        # Mock root response
-        mock_org_client.list_roots.return_value = {
-            "Roots": [{"Id": "r-1234"}]
-        }
-
-        # Mock OU listing failure
-        mock_org_client.list_organizational_units_for_parent.side_effect = ClientError(
-            {"Error": {"Code": "AccessDenied", "Message": "Failed to list OUs"}},
-            "ListOrganizationalUnitsForParent"
+        mock_org_client = make_paginated_org_client(
+            # The first OU listing fails, so nothing else is reached
+            ou_calls=[
+                ClientError(
+                    {"Error": {"Code": "AccessDenied", "Message": "Failed to list OUs"}},
+                    "ListOrganizationalUnitsForParent"
+                ),
+            ],
+            account_calls=[],
         )
-
-        # Mock account responses (empty)
-        mock_org_client.list_accounts_for_parent.return_value = {
-            "Accounts": []
-        }
+        mock_org_client.list_roots.return_value = {"Roots": [{"Id": "r-1234"}]}
+        mock_session.client.return_value = mock_org_client
 
         # Should raise exception on error
         with pytest.raises(RuntimeError, match="Failed to list OUs for parent None"):

@@ -11,12 +11,66 @@ from typing import Dict, List, Optional, Tuple
 from boto3.session import Session
 from botocore.exceptions import BotoCoreError, ClientError
 from mypy_boto3_organizations.client import OrganizationsClient
+from mypy_boto3_organizations.type_defs import AccountTypeDef, OrganizationalUnitTypeDef
 
 from ..types import OrganizationHierarchy, OrganizationalUnit, AccountOrgPlacement
 from ..utils import make_safe_variable_name
+from .helpers import paginate
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+def _list_organizational_units(
+    org_client: OrganizationsClient,
+    parent_id: str
+) -> List[OrganizationalUnitTypeDef]:
+    """
+    List every OU directly under a parent.
+
+    Paginated: ListOrganizationalUnitsForParent caps a page at twenty, and AWS
+    documents that it can return fewer even when more remain. Reading a single
+    response would drop whole subtrees from the hierarchy without any error.
+
+    Args:
+        org_client: AWS Organizations client
+        parent_id: Root or OU whose child OUs to list
+
+    Returns:
+        One entry per child OU
+    """
+    organizational_units: List[OrganizationalUnitTypeDef] = []
+    for page in paginate(org_client, "list_organizational_units_for_parent", ParentId=parent_id):
+        organizational_units.extend(page["OrganizationalUnits"])
+
+    return organizational_units
+
+
+def _list_accounts(
+    org_client: OrganizationsClient,
+    parent_id: str
+) -> List[AccountTypeDef]:
+    """
+    List every account directly under a parent.
+
+    Paginated for the same reason as `_list_organizational_units`. An account
+    missing from the hierarchy is invisible to the OU-level RCP safety check in
+    `headroom/terraform/generate_rcps.py`, which reads the hierarchy rather
+    than the result files, so a truncated page there attaches a policy over an
+    account that blocks it (INV-01).
+
+    Args:
+        org_client: AWS Organizations client
+        parent_id: Root or OU whose accounts to list
+
+    Returns:
+        One entry per account
+    """
+    accounts: List[AccountTypeDef] = []
+    for page in paginate(org_client, "list_accounts_for_parent", ParentId=parent_id):
+        accounts.extend(page["Accounts"])
+
+    return accounts
 
 
 def _build_ou_hierarchy(
@@ -26,7 +80,7 @@ def _build_ou_hierarchy(
     accounts: Dict[str, AccountOrgPlacement],
     parent_ou_id: Optional[str] = None,
     ou_path: Optional[List[str]] = None
-) -> None:
+) -> List[str]:
     """
     Recursively build OU hierarchy starting from parent_ou_id.
 
@@ -37,65 +91,50 @@ def _build_ou_hierarchy(
         accounts: Dictionary to store account information
         parent_ou_id: Parent OU ID to start from
         ou_path: Current OU path from root
+
+    Returns:
+        The IDs of the OUs directly under this parent. The caller records them
+        as that parent's children rather than listing them a second time.
     """
     if ou_path is None:
         ou_path = []
 
     try:
-        # List OUs under this parent
-        if parent_ou_id:
-            ous_response = org_client.list_organizational_units_for_parent(
-                ParentId=parent_ou_id
-            )
-        else:
-            ous_response = org_client.list_organizational_units_for_parent(
-                ParentId=root_id
-            )
-
-        for ou in ous_response.get("OrganizationalUnits", []):
-            ou_id = ou["Id"]
-            ou_name = ou["Name"]
-            current_path = ou_path + [ou_name]
-
-            # Get child OUs
-            child_ous = []
-            _build_ou_hierarchy(org_client, root_id, organizational_units, accounts, ou_id, current_path)
-
-            # Get accounts in this OU
-            try:
-                accounts_response = org_client.list_accounts_for_parent(
-                    ParentId=ou_id
-                )
-                account_ids = [acc["Id"] for acc in accounts_response.get("Accounts", [])]
-
-                # Store account information
-                for acc in accounts_response.get("Accounts", []):
-                    accounts[acc["Id"]] = AccountOrgPlacement(
-                        account_id=acc["Id"],
-                        account_name=acc["Name"],
-                        parent_ou_id=ou_id,
-                        ou_path=current_path
-                    )
-
-                # Get child OUs for this OU
-                child_ous_response = org_client.list_organizational_units_for_parent(
-                    ParentId=ou_id
-                )
-                child_ous = [child_ou["Id"] for child_ou in child_ous_response.get("OrganizationalUnits", [])]
-
-            except (ClientError, BotoCoreError) as e:
-                raise RuntimeError(f"Failed to get accounts/child OUs for OU {ou_id}: {e}")
-
-            organizational_units[ou_id] = OrganizationalUnit(
-                ou_id=ou_id,
-                name=ou_name,
-                parent_ou_id=parent_ou_id,
-                child_ous=child_ous,
-                accounts=account_ids
-            )
-
+        child_ous = _list_organizational_units(org_client, parent_ou_id or root_id)
     except (ClientError, BotoCoreError) as e:
         raise RuntimeError(f"Failed to list OUs for parent {parent_ou_id}: {e}")
+
+    for ou in child_ous:
+        ou_id = ou["Id"]
+        ou_name = ou["Name"]
+        current_path = ou_path + [ou_name]
+
+        grandchild_ou_ids = _build_ou_hierarchy(
+            org_client, root_id, organizational_units, accounts, ou_id, current_path
+        )
+
+        try:
+            ou_accounts = _list_accounts(org_client, ou_id)
+        except (ClientError, BotoCoreError) as e:
+            raise RuntimeError(f"Failed to get accounts for OU {ou_id}: {e}")
+
+        for acc in ou_accounts:
+            accounts[acc["Id"]] = AccountOrgPlacement(
+                account_id=acc["Id"],
+                account_name=acc["Name"],
+                parent_ou_id=ou_id,
+                ou_path=current_path
+            )
+
+        organizational_units[ou_id] = OrganizationalUnit(
+            ou_id=ou_id,
+            name=ou_name,
+            parent_ou_id=parent_ou_id,
+            child_ous=grandchild_ou_ids,
+            accounts=[acc["Id"] for acc in ou_accounts]
+        )
+
+    return [ou["Id"] for ou in child_ous]
 
 
 def analyze_organization_structure(session: Session) -> OrganizationHierarchy:
@@ -106,7 +145,7 @@ def analyze_organization_structure(session: Session) -> OrganizationHierarchy:
     """
     org_client: OrganizationsClient = session.client("organizations")
 
-    # Get root information
+    # Get root information. Not paginated: an organization has exactly one root.
     try:
         roots_response = org_client.list_roots()
         if not roots_response.get("Roots"):
@@ -125,19 +164,18 @@ def analyze_organization_structure(session: Session) -> OrganizationHierarchy:
 
     # Get accounts directly under root
     try:
-        root_accounts_response = org_client.list_accounts_for_parent(
-            ParentId=root_id
-        )
-        for acc in root_accounts_response.get("Accounts", []):
-            # No parent OU: these accounts hang directly off the organization root
-            accounts[acc["Id"]] = AccountOrgPlacement(
-                account_id=acc["Id"],
-                account_name=acc["Name"],
-                parent_ou_id=None,
-                ou_path=["Root"]
-            )
+        root_accounts = _list_accounts(org_client, root_id)
     except (ClientError, BotoCoreError) as e:
         raise RuntimeError(f"Failed to get accounts under root: {e}")
+
+    for acc in root_accounts:
+        # No parent OU: these accounts hang directly off the organization root
+        accounts[acc["Id"]] = AccountOrgPlacement(
+            account_id=acc["Id"],
+            account_name=acc["Name"],
+            parent_ou_id=None,
+            ou_path=["Root"]
+        )
 
     return OrganizationHierarchy(
         root_id=root_id,

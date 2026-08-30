@@ -106,6 +106,24 @@ tags per [`../contracts/configuration.md`](../contracts/configuration.md).
 The OU tree placement walks: the root ID, every OU with its parent, children, and
 accounts, and every account with its parent OU and path.
 
+**Every listing is paginated.** `ListAccountsForParent` and
+`ListOrganizationalUnitsForParent` cap a page at twenty, and AWS documents that
+either can return fewer even when more remain, so a single response is never
+evidence of a complete parent. This is load-bearing rather than tidy: the
+OU-level RCP safety predicate in [`../contracts/placement.md`](../contracts/placement.md)
+is evaluated against this hierarchy, not against the accounts that produced
+results, so an account missing from a truncated page is an account whose
+blockers no OU-level decision can see. A short read here is absence of evidence
+presented as safety (INV-01).
+
+`ListRoots` is the one exception, and is called once: an organization has exactly
+one root, and the code reads `Roots[0]`.
+
+The walk lists each parent's child OUs once. The recursive descent returns the
+IDs it listed, so the parent records its children from that return value rather
+than issuing a second identical call — which matters because Organizations is
+throttled tightly and pagination multiplies request counts.
+
 An account attached directly to the organization root has `parent_ou_id` of
 `None` and an `ou_path` of `["Root"]`. It belongs to no OU and cannot be targeted
 by an OU-level policy; the root ID is not a substitute.
