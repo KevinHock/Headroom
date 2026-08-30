@@ -55,7 +55,17 @@ Both condition on a tag; they mean opposite things.
 | Example tag | `PavedRoad=true` | `ExemptFromIMDSv2=true` |
 
 Prefer 3. Reach for 4 only when there is a real workload that cannot take the
-paved road, and name the tag for what it exempts.
+paved road, and name the tag for what it exempts — `ExemptFromIMDSv2`, never
+`special` — so an audit can tell what the exception buys.
+
+The retired taxonomy carried three further design principles that are
+deliberately not restated here. "Start with least privilege, then allowlist"
+describes designing a statement, which Headroom does not do — it decides whether
+a statement someone else wrote is deployable, and two shipped checks are
+deny-the-bad-behavior by construction. "Combine patterns for defense in depth"
+describes pattern 6, which nothing implements. "Document the why" is now the
+eleven-section contract in [`../checks/index.md`](../checks/index.md), enforced
+by `tests/test_spec_corpus.py` rather than asked for in prose.
 
 ### Pattern 5 variants
 
@@ -153,14 +163,24 @@ granted `sts:AssumeRole`. Each check's document states its own behavior.
 
 ### Actions
 
-An action is matched the way IAM matches it — case-insensitively, honoring `*`
-wildcards, and honoring `NotAction`. String comparison misses `sts:*`,
-`sts:Assume*`, `STS:AssumeRole`, and every `NotAction`.
+Only [`deny_sts_third_party_assumerole`](../checks/rcps/deny_sts_third_party_assumerole.md)
+**gates** on actions: a trust-policy statement counts only if its actions cover
+`sts:AssumeRole`. The other five analyzers read every `Allow` statement whatever
+it grants, and keep the action list for reporting alone.
+
+Where an action is matched, it is matched the way IAM matches it —
+case-insensitively, honoring `*` wildcards, and honoring `NotAction`. String
+comparison misses `sts:*`, `sts:Assume*`, `STS:AssumeRole`, and every
+`NotAction`.
+
+Prefer not gating at all. Gating narrows what the scan sees, which is the unsafe
+direction: an action the gate rejects is a grant the scan did not count and the
+RCP will still deny.
 
 ### What is deliberately not read
 
-RCP analysis reads `Effect`, `Principal`, and `Action`. It reads neither
-`Condition` nor `Resource`/`NotResource`.
+RCP analysis reads `Effect`, `Principal`, and — for STS alone — `Action`. It
+reads neither `Condition` nor `Resource`/`NotResource`.
 
 Both omissions **widen** what the scan sees, and widening is the safe direction:
 

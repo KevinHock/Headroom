@@ -102,6 +102,23 @@ Entry shape: `instance_id`, `region`, `hop_limit`, `imds_enabled`.
 Standard SCP placement at zero violations. Terraform variable
 `deny_ec2_imds_hop_limit`, a boolean. No allowlist.
 
+**Expect this check to stay unplaced.** Violations are the norm on a modern
+fleet rather than an edge case, for two compounding reasons:
+
+1. An AMI carrying `imds-support=v2.0` — current Amazon Linux 2023 among them —
+   supplies a hop limit above 1 to a launch that names no `MetadataOptions` at
+   all. A dry run against a live account confirms `MaxImdsHopLimit` denies that
+   default launch. A default AL2023 instance is a violation before anyone
+   configures anything.
+2. A container adds a network hop, so workloads on ECS, EKS, or plain Docker
+   generally need a hop limit of at least 2 to reach IMDS.
+
+Placement enables an SCP only where every covered account reports zero
+violations, so in practice this stays unplaced until a fleet explicitly pins hop
+limit 1 everywhere. Whether 1 is the right threshold for a fleet on modern AMIs
+is the operator's decision; this check does not assume it, it only reports what
+enforcing it would cost.
+
 ## Accepted limitations
 
 1. Launch-time only; the running fleet keeps whatever hop limit it has.

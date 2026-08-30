@@ -20,6 +20,15 @@ There is no loop and no second pass. Every stage reads the artifact the previous
 one produced and never writes back into it. A stage that cannot complete aborts
 the run (INV-02) rather than handing a partial artifact forward.
 
+**How the abort reaches the operator is uneven.** `main()` runs configuration,
+`perform_analysis`, and the security-session build *before* the `try` that wraps
+everything from organization discovery onward. A `ClientError` in the scan — the
+longest phase, spanning every account, region, and service — therefore surfaces
+as an unhandled traceback, while the same error during Terraform generation
+prints `AWS API Error (<code>)` and exits 1. Both abort, so INV-02 holds either
+way and no policy is affected; only the message differs. Widening the `try` to
+cover the scan is a presentation change, not a behavior change.
+
 ## The stages
 
 | Stage | Owner | Produces | Contract |
