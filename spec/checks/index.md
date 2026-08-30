@@ -71,7 +71,10 @@ And these sections, in this order:
 11. **Implementation** — links to source and tests
 
 A **Known conflict** section appears only where one exists, and says
-`Status: unresolved`.
+`Status: unresolved`. The register below and the check documents are two views
+of one set: every check the register's **Where** column names carries such a
+section, and every check carrying one is named there. A conflict recorded in
+only one of the two is a conflict half its readers never see.
 
 ## Unresolved conflicts
 
@@ -85,8 +88,8 @@ which side is right.
 | 1 | [`deny_iam_saml_provider_not_aws_sso`](scps/deny_iam_saml_provider_not_aws_sso.md) | The summary omits the `violations` count, so placement reads zero for **every** account unconditionally and always recommends the deny at root — including for an organization this check just found wholly non-compliant. The check is inert as a safety gate, not intermittently wrong. Contradicts the safety promise in [`../product.md`](../product.md). |
 | 2 | [`deny_iam_user_creation`](scps/deny_iam_user_creation.md) | No empty-allowlist guard. An account with no IAM users renders `NotResource: []`, which INV-06 forbids. `deny_ec2_ami_owner` guards the identical case. |
 | 3 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | An unparseable queue policy is logged and skipped rather than blocking the account, against INV-01. Every other analyzer aborts. |
-| 4 | ECR, KMS, Secrets Manager, SQS | A `Federated` principal aborts the whole run. It supplies no `aws:PrincipalAccount`, so it blocks the account exactly as a wildcard does — which is how [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records it. Four checks stop the run where one reports. |
-| 4b | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `CanonicalUser` principal raises `UnknownPrincipalTypeError`, which SQS alone catches and skips, so the account can still be cleared. ECR, KMS, Secrets Manager, and S3 let it abort. This is conflict 3 in a second guise and the worse of the two outcomes: an unreadable principal counted as no finding, against INV-01. |
+| 4 | [`deny_ecr_third_party_access`](rcps/deny_ecr_third_party_access.md), [`deny_kms_third_party_access`](rcps/deny_kms_third_party_access.md), [`deny_secrets_manager_third_party_access`](rcps/deny_secrets_manager_third_party_access.md), [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `Federated` principal aborts the whole run. It supplies no `aws:PrincipalAccount`, so it blocks the account exactly as a wildcard does — which is how [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records it. Four checks stop the run where one reports. |
+| 4b | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `CanonicalUser` principal raises `UnknownPrincipalTypeError`, which SQS alone catches and skips, so the account can still be cleared. ECR and KMS let that exception abort. Secrets Manager aborts too, but on `UnsupportedPrincipalTypeError`, raised before extraction is reached. [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records the principal as a violation and does not abort at all. This is conflict 3 in a second guise and the worse of the two outcomes: an unreadable principal counted as no finding, against INV-01. |
 | 5 | [`deny_eks_create_cluster_without_tag`](scps/deny_eks_create_cluster_without_tag.md) | The tag key is matched case-sensitively; IAM matches `aws:RequestTag/PavedRoad` case-insensitively. Conservative in direction, but inconsistent with [`deny_ec2_imds_v1`](scps/deny_ec2_imds_v1.md), where the asymmetry was measured. |
 | 6 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | `actions_by_third_party_account` includes in-organization accounts. A reporting defect only; the allowlist is built from a filtered field. |
 

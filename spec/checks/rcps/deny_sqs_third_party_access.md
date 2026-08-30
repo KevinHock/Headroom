@@ -76,13 +76,34 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
 | Unparseable policy JSON, or `UnknownPrincipalTypeError` | **Logged at warning; the queue is skipped** |
 
-The last row is a divergence from every other analyzer, and it runs against
-INV-01: a queue whose policy could not be read is dropped rather than blocking
-the account, so the account can be cleared for the RCP on the strength of a queue
-nobody managed to evaluate. Elsewhere, an unparseable policy aborts.
+## Known conflict: an unreadable queue policy or principal is skipped
+
+The last row of the table above is a divergence from every other analyzer, and
+it runs against INV-01: a queue whose policy could not be read is dropped rather
+than blocking the account, so the account can be cleared for the RCP on the
+strength of a queue nobody managed to evaluate. Elsewhere, an unparseable policy
+aborts.
+
+That row covers two distinct inputs. Unparseable policy JSON is conflict 3. A
+`CanonicalUser` principal is conflict 4b, and is the worse of the two: this is
+the only analyzer that catches `UnknownPrincipalTypeError`, so a principal no
+allowlist can express is counted as no finding at all. ECR and KMS let that same
+exception abort, Secrets Manager aborts on `UnsupportedPrincipalTypeError`
+instead, and [`deny_s3_third_party_access`](deny_s3_third_party_access.md)
+records the principal as a violation.
 
 **Status: unresolved.** Recorded rather than fixed, because raising here changes
-which accounts are cleared. See [`../index.md`](../index.md).
+which accounts are cleared. Conflicts 3 and 4b in [`../index.md`](../index.md).
+
+## Known conflict: aborting on a `Federated` principal
+
+A `Federated` principal raises `UnsupportedPrincipalTypeError` and stops the run,
+the same divergence as
+[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md). This check
+therefore aborts on one principal type no allowlist can express and silently
+skips another.
+
+**Status: unresolved.** Conflict 4 in [`../index.md`](../index.md).
 
 ## Result contract
 
@@ -112,6 +133,15 @@ reporting defect, not a policy defect.
 `has_non_account_principals` is always `false` on a returned entry, for the same
 reason as in
 [`deny_secrets_manager_third_party_access`](deny_secrets_manager_third_party_access.md).
+
+## Known conflict: the third-party action map counts in-organization accounts
+
+`actions_by_third_party_account` and `queues_by_third_party_account` carry
+in-organization account IDs, as described under Result contract above. A
+reporting defect only: the allowlist is built from `unique_third_party_accounts`,
+which is filtered, and nothing downstream reads the unfiltered fields.
+
+**Status: unresolved.** Conflict 6 in [`../index.md`](../index.md).
 
 ## Placement and generated policy
 

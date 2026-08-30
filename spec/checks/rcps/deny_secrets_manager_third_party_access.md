@@ -83,11 +83,23 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
 | A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| A `CanonicalUser` or other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
+| A `CanonicalUser` principal | `UnsupportedPrincipalTypeError`, aborting the run |
+| Any other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
 | An `Action` that is neither a string nor a list | `TypeError` |
 
-The `Federated` divergence described in
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) applies here too.
+## Known conflict: aborting on a `Federated` or `CanonicalUser` principal
+
+The divergence described in
+[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) applies here and
+reaches one principal type further. This check tests for both types before it
+extracts account IDs, so a `CanonicalUser` raises `UnsupportedPrincipalTypeError`
+here where ECR and KMS reach `UnknownPrincipalTypeError` instead. The outcome is
+the same — the run stops — and
+[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records both types
+as violations.
+
+**Status: unresolved.** Recorded rather than fixed, because changing it changes
+which policies are generated. Conflict 4 in [`../index.md`](../index.md).
 
 ## Result contract
 

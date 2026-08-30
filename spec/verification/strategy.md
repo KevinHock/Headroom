@@ -92,6 +92,7 @@ replacing it removes an invariant's only enforcement.
 | `test_every_state_aws_defines_is_classified` | INV-03 — a new AWS lifecycle state surfaces in CI |
 | `test_table_covers_every_registered_rcp_check` | INV-13 — `RCP_TERRAFORM_VARIABLES` matches the registry |
 | `tests/test_spec_corpus.py` | Every registered check has exactly one specification |
+| `test_the_conflict_register_and_the_check_documents_agree` | The conflict register and the per-check documents name the same checks |
 
 ## What the corpus test enforces
 
@@ -104,7 +105,10 @@ network and no AWS calls. It fails when:
   `kind` disagrees with the registry;
 - two specifications share an `id`;
 - a specification cites an invariant ID that `invariants.md` does not define;
-- a relative link inside `spec/` points at a file that does not exist.
+- a relative link inside `spec/` points at a file that does not exist;
+- a check is named in the unresolved-conflict register with no **Known
+  conflict** section in its own document, or carries one that the register does
+  not name.
 
 Adding a check therefore fails the suite until its specification exists. That is
 the intended order: the specification is written first.

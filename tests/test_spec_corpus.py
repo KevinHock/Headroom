@@ -7,7 +7,9 @@ import pytest
 from headroom.checks.registry import get_check_type_map
 from tests.documentation_links import find_broken_links
 from tests.spec_corpus import (
+    CONFLICT_REGISTER_HEADING,
     REQUIRED_FIELDS,
+    find_conflict_divergences,
     find_corpus_problems,
     invariant_ids,
     load_check_specifications,
@@ -56,14 +58,24 @@ verification:
 """
 
 
-def build_corpus(tmp_path: Path, document: str, name: str = "deny_ec2_public_ip.md") -> Path:
+def build_corpus(
+    tmp_path: Path,
+    document: str,
+    name: str = "deny_ec2_public_ip.md",
+    conflict_rows: str = ""
+) -> Path:
     """
     Write a one-document corpus whose repository root holds the real files.
+
+    The index carries the conflict register and nothing after it, so the
+    register runs to end of file here and to the next heading in the real
+    corpus.
 
     Args:
         tmp_path: pytest temporary directory
         document: Full text of the specification document
         name: Filename to write it under
+        conflict_rows: Rows for the unresolved-conflict register table
 
     Returns:
         The spec root inside the temporary tree
@@ -73,6 +85,9 @@ def build_corpus(tmp_path: Path, document: str, name: str = "deny_ec2_public_ip.
     (spec_root / "checks" / "scps").mkdir(parents=True)
     (spec_root / "checks" / "rcps").mkdir(parents=True)
     (spec_root / "checks" / "scps" / name).write_text(document)
+    (spec_root / "checks" / "index.md").write_text(
+        f"{CONFLICT_REGISTER_HEADING}\n\n| # | Where | Conflict |\n|---|---|---|\n{conflict_rows}"
+    )
     (spec_root / "invariants.md").write_text(
         (repository_root / "spec" / "invariants.md").read_text()
     )
@@ -106,6 +121,9 @@ class TestTheRealCorpus:
 
     def test_every_relative_link_in_the_corpus_resolves(self) -> None:
         assert find_broken_links(SPEC_ROOT) == []
+
+    def test_the_conflict_register_and_the_check_documents_agree(self) -> None:
+        assert find_conflict_divergences(SPEC_ROOT) == []
 
 
 class TestFrontmatter:
@@ -296,3 +314,54 @@ class TestMalformedFrontmatterValues:
         assert find_corpus_problems(spec_root, ONE_REGISTERED_CHECK) == [
             "deny_ec2_public_ip.md verification must be a list, not a NoneType"
         ]
+
+
+class TestConflictRegister:
+    """The register and the check documents are two views of one set."""
+
+    CONFLICT = (
+        "## Known conflict: the summary omits violations\n\n"
+        "**Status: unresolved.**\n\n"
+    )
+
+    def test_a_registered_check_with_no_conflict_section_is_reported(self, tmp_path: Path) -> None:
+        spec_root = build_corpus(
+            tmp_path,
+            GOOD_FRONTMATTER,
+            conflict_rows="| 1 | [`deny_ec2_public_ip`](scps/deny_ec2_public_ip.md) | It reads zero. |\n",
+        )
+
+        assert find_conflict_divergences(spec_root) == [
+            "deny_ec2_public_ip is named in the conflict register with no "
+            "'Known conflict:' section in its document"
+        ]
+
+    def test_a_conflict_section_the_register_omits_is_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace("## Accepted limitations\n", self.CONFLICT + "## Accepted limitations\n")
+        spec_root = build_corpus(tmp_path, document)
+
+        assert find_conflict_divergences(spec_root) == [
+            "deny_ec2_public_ip has a 'Known conflict:' section and the "
+            "conflict register does not name it"
+        ]
+
+    def test_a_check_in_both_views_is_not_reported(self, tmp_path: Path) -> None:
+        document = GOOD_FRONTMATTER.replace("## Accepted limitations\n", self.CONFLICT + "## Accepted limitations\n")
+        spec_root = build_corpus(
+            tmp_path,
+            document,
+            conflict_rows="| 1 | [`deny_ec2_public_ip`](scps/deny_ec2_public_ip.md) | It reads zero. |\n",
+        )
+
+        assert find_conflict_divergences(spec_root) == []
+
+    def test_a_link_outside_the_where_column_does_not_register_a_check(self, tmp_path: Path) -> None:
+        # Row 4 contrasts itself with deny_s3_third_party_access in its prose,
+        # which must not read as S3 carrying the conflict.
+        spec_root = build_corpus(
+            tmp_path,
+            GOOD_FRONTMATTER,
+            conflict_rows="| 1 | ECR | Unlike [`x`](rcps/deny_s3_third_party_access.md), it aborts. |\n",
+        )
+
+        assert find_conflict_divergences(spec_root) == []

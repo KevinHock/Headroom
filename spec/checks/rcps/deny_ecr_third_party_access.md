@@ -78,13 +78,15 @@ Permitted principal types are `AWS` and `Service`.
 | A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
 | A `CanonicalUser` or other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
 
-**Aborting on a `Federated` principal is a known divergence.** Such a principal
-carries no account ID and so blocks the account, exactly as a wildcard does —
-[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records that as a
-violation and lets the rest of the organization generate, while this check stops
-the whole run. Reporting is the better behavior; changing it changes which
-policies are generated, so it is recorded here rather than fixed. See
-[`../index.md`](../index.md).
+## Known conflict: aborting on a `Federated` principal
+
+Such a principal carries no account ID and so blocks the account, exactly as a
+wildcard does — [`deny_s3_third_party_access`](deny_s3_third_party_access.md)
+records that as a violation and lets the rest of the organization generate,
+while this check stops the whole run. Reporting is the better behavior.
+
+**Status: unresolved.** Recorded rather than fixed, because changing it changes
+which policies are generated. Conflict 4 in [`../index.md`](../index.md).
 
 ## Result contract
 

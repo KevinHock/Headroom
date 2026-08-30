@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import yaml
 
@@ -38,7 +38,12 @@ REQUIRED_SECTIONS = (
 CONFLICT_SECTION_PREFIX = "Known conflict:"
 CONFLICT_STATUS = "Status: unresolved"
 
+# The register in checks/index.md that names every unresolved conflict.
+CONFLICT_REGISTER_HEADING = "## Unresolved conflicts"
+
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+_NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
+_CHECK_DOCUMENT_LINK = re.compile(r"\]\((?:scps|rcps)/([a-z0-9_]+)\.md\)")
 _INVARIANT_HEADING = re.compile(r"^## (INV-\d+)\b", re.MULTILINE)
 _SECTION_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
 
@@ -259,5 +264,98 @@ def find_corpus_problems(spec_root: Path, check_types: Dict[str, str]) -> List[s
     specified = {specification.path.stem for specification in specifications}
     for check_name in sorted(set(check_types) - specified):
         problems.append(f"registered check {check_name} has no specification")
+
+    return sorted(problems)
+
+
+def _conflict_register(spec_root: Path) -> str:
+    """
+    Return the body of the unresolved-conflict register.
+
+    Args:
+        spec_root: The spec/ directory
+
+    Returns:
+        Everything between the register heading and the next section heading
+    """
+    text = (spec_root / "checks" / "index.md").read_text()
+    start = text.index(CONFLICT_REGISTER_HEADING) + len(CONFLICT_REGISTER_HEADING)
+    next_section = _NEXT_SECTION.search(text, start)
+    if not next_section:
+        return text[start:]
+
+    return text[start:next_section.start()]
+
+
+def _registered_conflict_checks(spec_root: Path) -> Set[str]:
+    """
+    Return the checks the register's Where column names.
+
+    Only that column counts. A conflict's prose routinely links a *different*
+    check for contrast, and the paragraph below the table links the two gaps
+    recorded elsewhere precisely because they are not conflicts.
+
+    Args:
+        spec_root: The spec/ directory
+
+    Returns:
+        Check names
+    """
+    names: Set[str] = set()
+    for line in _conflict_register(spec_root).splitlines():
+        if not line.startswith("|"):
+            continue
+        names.update(_CHECK_DOCUMENT_LINK.findall(line.split("|")[2]))
+
+    return names
+
+
+def _documented_conflict_checks(spec_root: Path) -> Set[str]:
+    """
+    Return the checks whose own document carries a conflict section.
+
+    Args:
+        spec_root: The spec/ directory
+
+    Returns:
+        Check names
+    """
+    names: Set[str] = set()
+    for specification in load_check_specifications(spec_root):
+        headings: List[str] = _SECTION_HEADING.findall(specification.path.read_text())
+        if any(heading.startswith(CONFLICT_SECTION_PREFIX) for heading in headings):
+            names.add(specification.path.stem)
+
+    return names
+
+
+def find_conflict_divergences(spec_root: Path) -> List[str]:
+    """
+    Report where the conflict register and the check documents disagree.
+
+    The register and the per-check documents are two views of one set. A reader
+    who opens a check document rather than the index must see the same
+    conflicts, so a name may not appear in one view and be absent from the
+    other. The section contract in `_section_problems` cannot catch this: it
+    checks a conflict section it can see, and a document that simply has none
+    passes it vacuously.
+
+    Args:
+        spec_root: The spec/ directory
+
+    Returns:
+        Problem descriptions, sorted
+    """
+    registered = _registered_conflict_checks(spec_root)
+    documented = _documented_conflict_checks(spec_root)
+
+    problems = [
+        f"{name} is named in the conflict register with no '{CONFLICT_SECTION_PREFIX}' section in its document"
+        for name in registered - documented
+    ]
+    problems.extend(
+        f"{name} has a '{CONFLICT_SECTION_PREFIX}' section and the conflict register does not name it"
+        for name in documented - registered
+    )
 
     return sorted(problems)

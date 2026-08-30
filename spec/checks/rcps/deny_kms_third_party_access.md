@@ -86,8 +86,17 @@ in-organization principal and so is never recorded.
 | A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
 | A `CanonicalUser` or other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
 
-The same `Federated` divergence as
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) applies here.
+## Known conflict: aborting on a `Federated` principal
+
+The same divergence as
+[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md), for the same
+reason: the principal carries no account ID, so it blocks the account exactly as
+a wildcard does, and
+[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records that
+rather than stopping the run.
+
+**Status: unresolved.** Recorded rather than fixed, because changing it changes
+which policies are generated. Conflict 4 in [`../index.md`](../index.md).
 
 ## Result contract
 
