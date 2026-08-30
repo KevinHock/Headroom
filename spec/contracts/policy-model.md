@@ -224,7 +224,12 @@ it grants, and keep the action list for reporting alone.
 
 `normalize_actions` in `headroom/aws/policy_documents.py` is the only place an
 `Action` element is read, for the same reason `read_principal` is the only place
-a `Principal` element is. It answers the actions the element names and **raises
+a `Principal` element is. Both claims are enforced rather than
+asserted: `test_only_policy_documents_reads_a_statement_principal` and
+`test_only_policy_documents_normalizes_a_statement_action` walk the package and
+fail on a second reader. A divergent copy fails no other test, because each
+analyzer's suite passes against its own reader — which is how the drift survived
+four rounds. It answers the actions the element names and **raises
 `TypeError`** for anything that is neither a string nor an array: IAM stores an
 `Action` in one of those two shapes and nothing else, so a third shape is a
 document AWS could not have stored, on the aborting side of the line above. Five

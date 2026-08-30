@@ -2,9 +2,13 @@
 Tests for headroom.aws.policy_documents module.
 """
 
+import ast
+from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
+
+import headroom
 
 from headroom.aws.policy_documents import (
     MalformedPolicyError,
@@ -870,3 +874,69 @@ class TestHasActionableServicePrincipalSource:
     def test_no_sources_is_not_actionable(self) -> None:
         """A statement naming no service principal has nothing worth keeping."""
         assert has_actionable_service_principal_source([]) is False
+
+
+class TestOneReaderPerStatementElement:
+    """
+    The readers of a statement element live in policy_documents.py alone.
+
+    Six copies of the Principal walk once disagreed four ways, and five copies
+    of the Action reader disagreed four ways after that. Both were collapsed
+    into one function, but nothing stopped a seventh copy appearing next to a
+    new feature - which is how every previous copy arrived. These pin the
+    collapse statically, because a divergent copy fails no other test: each
+    analyzer's own suite passes against its own reader, which is exactly how
+    the drift survived.
+
+    A statement element is polymorphic - a string, a list, or an object - so a
+    function taking one is a reader. The exceptions below all take a plain
+    `str` and are named here rather than excluded by a rule, so that adding one
+    is a deliberate edit.
+    """
+
+    @staticmethod
+    def _functions_taking(parameter_names: frozenset[str]) -> set[str]:
+        """
+        Report every function in the package taking one of these parameters.
+
+        Args:
+            parameter_names: The parameter names that mark a reader
+
+        Returns:
+            "<module>.<function>" for each, module-relative to the package
+        """
+        package_root = Path(headroom.__file__).parent
+
+        found = set()
+        for path in sorted(package_root.rglob("*.py")):
+            for node in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(node, ast.FunctionDef):
+                    continue
+                arguments = node.args.args + node.args.kwonlyargs
+                if not parameter_names.intersection(a.arg for a in arguments):
+                    continue
+                module = path.relative_to(package_root).as_posix()
+                found.add(f"{module}.{node.name}")
+
+        return found
+
+    def test_only_policy_documents_reads_a_statement_principal(self) -> None:
+        """A Principal element is read in one place, or it drifts."""
+        assert self._functions_taking(frozenset({"principal"})) == {
+            "aws/policy_documents.py._account_ids_in_string",
+            "aws/policy_documents.py.read_principal",
+            "aws/policy_documents.py._service_principals",
+            # A grant's principal is a plain ARN string from ListGrants, not a
+            # statement's Principal element, and no allowlist reads it.
+            "aws/kms.py._grant_principal_account_id",
+            "aws/kms.py._external_grant_account",
+        }
+
+    def test_only_policy_documents_normalizes_a_statement_action(self) -> None:
+        """An Action element is read in one place, or it drifts."""
+        assert self._functions_taking(frozenset({"action", "actions"})) == {
+            "aws/policy_documents.py.normalize_actions",
+            # Matches one already-normalized action against one pattern; it
+            # never sees the Action element.
+            "aws/iam/roles.py._action_pattern_matches",
+        }

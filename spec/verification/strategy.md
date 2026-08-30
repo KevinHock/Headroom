@@ -97,6 +97,8 @@ replacing it removes an invariant's only enforcement.
 | `test_no_identifier_from_the_exception_appears_outside_it` | INV-15 — a real identifier stays inside `test_environment/` |
 | `test_a_summary_without_the_key_raises` | INV-01 — a missing violation count aborts rather than clearing the account |
 | `test_a_written_result_parses` | Each check's own output survives the reader that consumes it |
+| `test_only_policy_documents_reads_a_statement_principal` | One reader for the `Principal` element — six copies once disagreed four ways |
+| `test_only_policy_documents_normalizes_a_statement_action` | One reader for the `Action` element — five copies then disagreed four ways |
 
 ## What the corpus test enforces
 
