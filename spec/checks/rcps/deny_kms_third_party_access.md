@@ -91,8 +91,8 @@ in-organization principal and so is never recorded.
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
 A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
-run — conflict 4, the same divergence as
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) and resolved the
+run — the same divergence as
+[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md), resolved the
 same way. Such a principal carries no account ID, so it blocks the account
 exactly as a wildcard does, and blocking is what recording a violation says. The
 rule is stated once in

@@ -70,7 +70,7 @@ def find_tag_value_as_iam_matches(
     for a live workload.
 
     Both tag checks share this because they read the same kind of tag, and
-    reading it by two different rules is what conflict 5 was.
+    reading it by two different rules is a bug this repository has had once.
 
     Args:
         tags: The resource's tags

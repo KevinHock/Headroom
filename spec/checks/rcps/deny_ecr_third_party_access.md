@@ -83,7 +83,7 @@ The `Principal` element is read by `read_principal` against
 | A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
 A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
-run — conflict 4. It is now a violation: the principal carries no account ID, so
+run. It is now a violation: the principal carries no account ID, so
 the allowlist cannot preserve it and the account must not take this RCP, which
 is what recording a violation says. Aborting said the same thing at the cost of
 every other account's results. The rule is stated once in

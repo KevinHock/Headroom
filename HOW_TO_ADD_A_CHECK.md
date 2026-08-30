@@ -591,8 +591,8 @@ resource whose only finding is the second is discarded before it is counted.
 
 Let `UnknownPrincipalTypeError` propagate. Every analyzer aborts the run on a
 principal key AWS does not document, and catching it clears the account on the
-strength of a resource nobody read. That was conflict 4b. See
-[`spec/contracts/policy-model.md`](spec/contracts/policy-model.md).
+strength of a resource nobody read. One analyzer did exactly that until it was
+fixed. See [`spec/contracts/policy-model.md`](spec/contracts/policy-model.md).
 
 **Variables:**
 - `{service}`: `sqs`
@@ -802,8 +802,8 @@ The regex was the first half of that lesson and the whole `Principal` walk was
 the second. Six analyzers each carried their own, and they diverged on more than
 a pattern: which principal types they permitted, whether an unreadable one
 aborted the run or was skipped, and whether one carrying no account ID was a
-finding at all. Four answers to one question, recorded as conflicts 4 and 4b.
-`read_principal` in `headroom/aws/policy_documents.py` is now the only place a
+finding at all. Four answers to one question. `read_principal` in
+`headroom/aws/policy_documents.py` is now the only place a
 `Principal` element is interpreted; call it rather than writing the walk again.
 
 ---
@@ -866,7 +866,7 @@ Four ways they drift apart, all observed in this repo:
    raise rather than pick one. All three rules live in
    `find_tag_value_as_iam_matches` in `headroom/aws/helpers.py`; call it rather
    than writing the comparison again. Two checks reading the same kind of tag
-   by two different rules is what conflict 5 was.
+   by two different rules is a bug this repository has had once.
 
 3. **Request state vs. resource state.** A condition key on a create action is
    evaluated against the request, not against the object that results, so a

@@ -91,8 +91,8 @@ The `Principal` element is read by `read_principal` against
 | An `Action` that is neither a string nor a list | `TypeError` |
 
 A `Federated` or `CanonicalUser` principal used to raise
-`UnsupportedPrincipalTypeError` here and stop the whole run — conflict 4. This
-check reached it one principal type further than ECR and KMS did, because it
+`UnsupportedPrincipalTypeError` here and stop the whole run. This check
+reached it one principal type further than ECR and KMS did, because it
 tested for both types before extracting account IDs. All three now record the
 principal as a violation: it carries no account ID, so the allowlist cannot
 preserve it and the account must not take this RCP. The rule is stated once in
@@ -118,7 +118,8 @@ Entry shape: `secret_name`, `secret_arn`, `third_party_account_ids`,
 `has_non_account_principals` carries the verdict rather than decorating it: it
 is the field that makes a secret naming a `Federated` or `CanonicalUser`
 principal a violation. It was dead while the analyzer raised instead of setting
-it, and resolving conflict 4 is what brought it into use.
+it, and it came into use when the five analyzers converged on recording such a
+principal.
 
 `secrets_with_wildcards` counts every violation, so a secret blocked only by a
 principal carrying no account ID is counted there despite the name.

@@ -80,8 +80,8 @@ resource-policy set at all.
 S3 was the only check that recorded `Federated` and `CanonicalUser` principals
 as findings rather than aborting, and it was right: they carry no account ID, so
 no allowlist can express them, and they block the account exactly as a wildcard
-does. The other four resource-policy analyzers raised instead, which was
-conflict 4. They have converged on this behavior, and the rule now lives in
+does. The other four resource-policy analyzers raised instead. They have
+converged on this behavior, and the rule now lives in
 [`../../contracts/policy-model.md`](../../contracts/policy-model.md) rather than
 here.
 

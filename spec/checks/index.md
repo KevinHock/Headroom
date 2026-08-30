@@ -88,22 +88,19 @@ not fixed**, because resolving it changes which policies are generated — and
 [`../README.md`](../README.md) requires reporting a conflict rather than guessing
 which side is right.
 
-**The numbers are stable identifiers, not positions.** They are cited from the
-check documents, so a resolved conflict leaves its number retired rather than
-renumbering the rest. Seven are retired and none is open:
-
-| Retired | Was | Fixed by |
-|---|---|---|
-| 1 | `deny_iam_saml_provider_not_aws_sso` reported no violation count | It now writes the count placement reads |
-| 2 | `deny_iam_user_creation` rendered an empty `NotResource` | It now leaves its policy off instead |
-| 3 | `deny_sqs_third_party_access` skipped an unparseable queue policy | It now aborts, as every other resource-policy analyzer does |
-| 4 | ECR, KMS, Secrets Manager, and SQS aborted the run on a `Federated` principal, where S3 recorded it | All five now record it as a violation, through one reader, `read_principal` |
-| 4b | `deny_sqs_third_party_access` skipped a queue naming a `CanonicalUser` principal, clearing the account | Same reader: `CanonicalUser` is a documented principal type and now blocks the account like any other principal no allowlist can carry |
-| 5 | `deny_eks_create_cluster_without_tag` matched the tag key case-sensitively | Both tag checks now share one reader, `find_tag_value_as_iam_matches` |
-| 6 | `deny_sqs_third_party_access` keyed in-organization accounts into `actions_by_third_party_account` | The organization filter now runs where an account is admitted, as it does in the other four analyzers |
+**None are open.**
 
 | # | Where | Conflict |
 |---|---|---|
+
+A resolved conflict leaves nothing behind here. What it was and how it was
+settled is in git history, and the rule it produced is in the document that owns
+that rule — so a row kept after the fact would be a second copy of a settled
+rule, going stale on its own schedule.
+
+A number is allocated once and never reused, because commit messages cite them
+and git history cannot be edited. **The next conflict is 7.** Whoever opens it
+advances that number here.
 
 Two further gaps are recorded where they belong rather than here, because they
 are limitations of the design rather than disagreements with it: KMS grants are

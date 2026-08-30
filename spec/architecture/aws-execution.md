@@ -155,7 +155,7 @@ Two deliberate exceptions, both narrow:
 | Tolerated | Why |
 |---|---|
 | Any `ClientError` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them. Wider than intended — see [`../contracts/configuration.md`](../contracts/configuration.md) |
-| Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped. The last exception was [`deny_sqs_third_party_access`](../checks/rcps/deny_sqs_third_party_access.md), which dropped a queue naming an unrecognized principal key; that was conflict 4b and it is resolved |
+| Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped. The last exception was [`deny_sqs_third_party_access`](../checks/rcps/deny_sqs_third_party_access.md), which dropped a queue naming an unrecognized principal key, and that is fixed |
 
 ### What a policy document may and may not stop the run over
 
@@ -171,8 +171,7 @@ for this document is that only the first kind reaches INV-02:
 | A document AWS accepted that no allowlist can express | `Principal: "*"`, an `Allow` with `NotPrincipal`, a `Federated` or `CanonicalUser` principal | **Blocks the account** for that check. Recorded as a violation; the scan continues |
 
 The second kind used to abort in four of the five resource-policy analyzers,
-which protected one account at the cost of every other account's results. That
-was conflict 4.
+which protected one account at the cost of every other account's results.
 
 `main` catches `ValueError`, `RuntimeError`, and `ClientError` around
 organization discovery, Terraform generation, and reconciliation, printing a

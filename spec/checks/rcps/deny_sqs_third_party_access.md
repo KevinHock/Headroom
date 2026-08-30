@@ -82,11 +82,11 @@ The `Principal` element is read by `read_principal` against
 
 **This analyzer catches nothing a policy document can raise.** It once caught
 `UnknownPrincipalTypeError` and skipped the queue, which cleared the account on
-the strength of a queue nobody had read — conflict 4b, against INV-01 — and it
-once raised on a `Federated` principal and stopped the whole run, which was
-conflict 4. Both are resolved: a principal no allowlist can carry is now a
-violation like any other blocker, and a principal key AWS does not document
-aborts here exactly as it does everywhere else. The rule is stated once in
+the strength of a queue nobody had read, against INV-01, and it once raised on
+a `Federated` principal and stopped the whole run. Both are fixed: a principal
+no allowlist can carry is now a violation like any other blocker, and a
+principal key AWS does not document aborts here exactly as it does everywhere
+else. The rule is stated once in
 [`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
