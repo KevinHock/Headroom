@@ -163,12 +163,31 @@ examples of what a run produces. They are illustrative, not normative: where the
 disagree with [`../spec/`](../spec/README.md), the specification is right and the
 committed output is stale.
 
-**These files contain real AWS account IDs** belonging to third-party security
-vendors, used as the third-party accounts the RCP scenarios grant access to. They
-appear in the root `.tf` files, in `headroom_results/rcps/`, and in the generated
-`rcps/acme_acquisition_ou_rcps.tf`.
+**These files contain real AWS account IDs** belonging to third-party vendors,
+used as the third-party accounts the RCP scenarios grant access to. Most are
+security vendors, which is what an organization grants cross-account access to
+in practice; the rest are an operating-system publisher, a container registry,
+and an observability vendor.
+
+| Where | Holds |
+|---|---|
+| `test_deny_sts_third_party_assumerole.tf` | Eleven, one per trust-policy scenario |
+| `test_deny_kms_third_party_access.tf`, `test_deny_s3_third_party_access.tf`, `test_deny_secrets_manager_third_party_access.tf`, `test_deny_sqs_third_party_access.tf` | Three, the same three across all four |
+| `test_deny_ecr_third_party_access.tf` | Two, a container registry and an observability vendor |
+| `test_deny_ec2_ami_owner/data.tf` | One, the operating-system publisher whose AMI the scenario launches |
+| `test_deny_kms_third_party_access/README.md`, `test_deny_secrets_manager_third_party_access/README.md` | The same three again, quoted in the walkthrough |
+| `headroom_results/rcps/` | Whichever the scan found, as recorded output |
+| `rcps/acme_acquisition_ou_rcps.tf` | One, in the generated allowlist |
 
 This is the standing exception to INV-15, recorded at the invariant itself
 ([`../spec/invariants.md`](../spec/invariants.md)) — this file describes where
 the identifiers are, not whether they are allowed. No new one may be added, and
 nothing outside `test_environment/` is covered.
+
+**The operator's own account IDs are a different matter, and are not covered.**
+Buckets here are named `headroom-test-<scenario>-<account id>` for global
+uniqueness, so a scan records that account ID inside the bucket name, where
+redaction cannot reach it — it matches the account field of an ARN, and an S3
+bucket ARN has none. Rewrite those names to placeholders after refreshing
+`headroom_results/`. Terraform rebuilds them from `data.aws_caller_identity` at
+apply time, so nothing reads the committed value.

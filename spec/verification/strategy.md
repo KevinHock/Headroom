@@ -93,6 +93,8 @@ replacing it removes an invariant's only enforcement.
 | `test_table_covers_every_registered_rcp_check` | INV-13 — `RCP_TERRAFORM_VARIABLES` matches the registry |
 | `tests/test_spec_corpus.py` | Every registered check has exactly one specification |
 | `test_the_conflict_register_and_the_check_documents_agree` | The conflict register and the per-check documents name the same checks |
+| `test_the_documented_count_matches_what_the_live_test_directory_holds` | INV-15 — the standing exception's stated size matches the directory |
+| `test_no_identifier_from_the_exception_appears_outside_it` | INV-15 — a real identifier stays inside `test_environment/` |
 
 ## What the corpus test enforces
 
@@ -112,6 +114,24 @@ network and no AWS calls. It fails when:
 
 Adding a check therefore fails the suite until its specification exists. That is
 the intended order: the specification is written first.
+
+## What the identifier test enforces
+
+`tests/test_data_standards.py` reads the repository as text. INV-15 states the
+size of its own standing exception in prose, and nothing compared that sentence
+to `test_environment/`, so it drifted: the invariant said thirteen while sixteen
+were committed, and two of the sixteen were the operator's own account IDs
+rather than a vendor's. The test fails when:
+
+- the count INV-15 spells disagrees with the identifiers `test_environment/`
+  holds, whether one was added or the prose was left behind;
+- an identifier from the exception appears outside `test_environment/`.
+
+It cannot recognize a newly pasted identifier on sight, because a twelve-digit
+number carries no evidence of being real. It catches the arrival indirectly:
+adding one to `test_environment/` moves the count, and adding one anywhere else
+is caught only once it also appears in the sandbox. Review is still the first
+line, and INV-15 still binds where the test is silent.
 
 ## Live verification
 

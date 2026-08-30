@@ -215,17 +215,36 @@ length, and a body of one repeated digit: `111111111111`,
 An identifier arriving from a bug report, error message, console screenshot, or
 API response is real. Rewrite it before it enters the repository.
 
-**One standing exception.** `test_environment/` commits thirteen real
-twelve-digit account IDs belonging to third-party vendors — in the live-test
-Terraform, in the results it produced, and in the RCP allowlist generated from
-them. They are load-bearing: an IAM trust policy naming an account that does not
-exist is rejected at `terraform apply`, so rewriting them would break the live
-test this repository uses to prove its own output. They are public vendor
-identifiers rather than the operator's, which is what makes the trade acceptable
-and does not make it compliant. No new one may be added, and no identifier
-outside `test_environment/` is covered.
+**One standing exception.** `test_environment/` commits fourteen real
+twelve-digit account IDs belonging to third-party vendors — mostly security
+vendors, since those are what an organization actually grants cross-account
+access to, alongside an operating-system publisher, a container registry, and an
+observability vendor. They appear in the live-test Terraform, in the results it
+produced, and in the RCP allowlist generated from them. They are load-bearing:
+an IAM trust policy naming an account that does not exist is rejected at
+`terraform apply`, so rewriting them would break the live test this repository
+uses to prove its own output. Each is an identifier its vendor publishes for
+customers to name in policy, never the operator's own, which is what makes the
+trade acceptable and does not make it compliant. No new one may be added, and no
+identifier outside `test_environment/` is covered.
 [`../test_environment/README.md`](../test_environment/README.md) describes where
 they appear.
+
+**The operator's own identifiers are not covered, and two reached the repository
+anyway.** `headroom_results/` recorded S3 bucket names ending in the account ID
+of the account holding the bucket, because the scenarios name buckets that way
+for global uniqueness. Redaction did not catch them and will not: it matches the
+account field of an ARN, and `arn:aws:s3:::name` has no account field, per
+[`contracts/results.md`](contracts/results.md#redaction). They were rewritten to
+placeholders, which cost nothing — Terraform builds those names at apply time
+from `data.aws_caller_identity`, so nothing reads the recorded value. A live run
+regenerates the files and reintroduces them, so it is a manual step after every
+refresh until the scenarios stop naming buckets after the account.
+
+The count above is not maintained by hand. `tests/test_data_standards.py` reads
+it back and fails when it disagrees with what the directory holds, which is how
+it came to say thirteen while sixteen were committed; the same test fails when
+an identifier from the exception appears anywhere outside it.
 ## INV-16 — Credentials are minted regionally, and only enabled regions are scanned
 
 Every boto3 session is built by `headroom/aws/sessions.py` with

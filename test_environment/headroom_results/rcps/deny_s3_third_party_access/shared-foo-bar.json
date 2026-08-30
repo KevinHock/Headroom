@@ -30,21 +30,21 @@
     },
     "buckets_by_third_party_account": {
       "749430749651": [
-        "arn:aws:s3:::headroom-test-mixed-access-754902277551"
+        "arn:aws:s3:::headroom-test-mixed-access-999999999999"
       ],
       "758245563457": [
-        "arn:aws:s3:::headroom-test-multiple-third-parties-754902277551",
-        "arn:aws:s3:::headroom-test-wildcard-action-754902277551"
+        "arn:aws:s3:::headroom-test-multiple-third-parties-999999999999",
+        "arn:aws:s3:::headroom-test-wildcard-action-999999999999"
       ],
       "517716713836": [
-        "arn:aws:s3:::headroom-test-multiple-third-parties-754902277551"
+        "arn:aws:s3:::headroom-test-multiple-third-parties-999999999999"
       ]
     }
   },
   "buckets_third_parties_can_access": [
     {
-      "bucket_name": "headroom-test-mixed-access-754902277551",
-      "bucket_arn": "arn:aws:s3:::headroom-test-mixed-access-754902277551",
+      "bucket_name": "headroom-test-mixed-access-999999999999",
+      "bucket_arn": "arn:aws:s3:::headroom-test-mixed-access-999999999999",
       "third_party_account_ids": [
         "749430749651"
       ],
@@ -59,8 +59,8 @@
       }
     },
     {
-      "bucket_name": "headroom-test-multiple-third-parties-754902277551",
-      "bucket_arn": "arn:aws:s3:::headroom-test-multiple-third-parties-754902277551",
+      "bucket_name": "headroom-test-multiple-third-parties-999999999999",
+      "bucket_arn": "arn:aws:s3:::headroom-test-multiple-third-parties-999999999999",
       "third_party_account_ids": [
         "517716713836",
         "758245563457"
@@ -79,8 +79,8 @@
       }
     },
     {
-      "bucket_name": "headroom-test-wildcard-action-754902277551",
-      "bucket_arn": "arn:aws:s3:::headroom-test-wildcard-action-754902277551",
+      "bucket_name": "headroom-test-wildcard-action-999999999999",
+      "bucket_arn": "arn:aws:s3:::headroom-test-wildcard-action-999999999999",
       "third_party_account_ids": [
         "758245563457"
       ],
