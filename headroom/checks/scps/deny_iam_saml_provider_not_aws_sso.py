@@ -128,10 +128,22 @@ class DenySamlProviderNotAwsSsoCheck(BaseCheck[SamlProviderAnalysis]):
         if self._total_providers == 1 and not self._non_awssso_provider_arns:
             allowed_provider_arn = self._awssso_provider_arns[0]
 
+        # Placement reads summary.violations and nothing else. Reporting the
+        # offenders only in violating_provider_arns left every account looking
+        # clean, so the deny was recommended at root over organizations this
+        # check had just rejected.
+        compliant_count = len(check_result.compliant)
+        total = len(check_result.violations) + compliant_count
+        compliance_pct = (compliant_count / total * 100) if total else 100
+
         return {
             "total_saml_providers": self._total_providers,
             "awssso_provider_count": len(self._awssso_provider_arns),
             "non_awssso_provider_count": len(self._non_awssso_provider_arns),
             "allowed_provider_arn": allowed_provider_arn,
             "violating_provider_arns": violating_arns,
+            "violations": len(check_result.violations),
+            "exemptions": len(check_result.exemptions),
+            "compliant": compliant_count,
+            "compliance_percentage": compliance_pct,
         }

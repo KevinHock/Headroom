@@ -197,6 +197,7 @@ def test_build_scp_terraform_module_multiple_checks_all_compliant() -> None:
             affected_accounts=[],
             compliance_percentage=100.0,
             reasoning="test",
+            allowed_iam_user_arns=["arn:aws:iam::111111111111:user/terraform-user"],
         ),
     ]
     result = _build_scp_terraform_module(
@@ -210,7 +211,7 @@ def test_build_scp_terraform_module_multiple_checks_all_compliant() -> None:
     assert "deny_iam_user_creation = true" in result
     assert "deny_iam_saml_provider_not_aws_sso = false" in result
     assert "deny_rds_unencrypted = false" in result
-    assert "iam_allowed_users = []" in result
+    assert "arn:aws:iam::111111111111:user/terraform-user" in result
 
 
 def test_build_scp_terraform_module_with_iam_user_arns() -> None:
@@ -382,6 +383,7 @@ def test_build_scp_terraform_module_enables_every_recommendation_it_is_given() -
             affected_accounts=[],
             compliance_percentage=100.0,
             reasoning="test",
+            allowed_iam_user_arns=["arn:aws:iam::111111111111:user/terraform-user"],
         ),
     ]
     result = _build_scp_terraform_module(
@@ -426,6 +428,7 @@ def make_rec(
     level: str = "root",
     target_ou_id: str | None = None,
     affected_accounts: list[str] | None = None,
+    allowed_iam_user_arns: list[str] | None = None,
 ) -> SCPPlacementRecommendations:
     return SCPPlacementRecommendations(
         check_name=check_name,
@@ -434,6 +437,7 @@ def make_rec(
         affected_accounts=affected_accounts if affected_accounts is not None else [],
         compliance_percentage=100.0,
         reasoning="test",
+        allowed_iam_user_arns=allowed_iam_user_arns if allowed_iam_user_arns is not None else [],
     )
 
 
@@ -525,7 +529,13 @@ def test_render_root_scp_terraform_renders_root_scps_tf() -> None:
 
 def test_render_root_scp_terraform_multiple_checks() -> None:
     org = make_org_empty()
-    recs = [make_rec(), make_rec(check_name="deny-iam-user-creation")]
+    recs = [
+        make_rec(),
+        make_rec(
+            check_name="deny-iam-user-creation",
+            allowed_iam_user_arns=["arn:aws:iam::111111111111:user/terraform-user"],
+        ),
+    ]
 
     _, content = _render_root_scp_terraform(recs, org, Path("/nonexistent"))
 
@@ -533,7 +543,7 @@ def test_render_root_scp_terraform_multiple_checks() -> None:
     assert "deny_iam_user_creation = true" in content
     assert "deny_iam_saml_provider_not_aws_sso = false" in content
     assert "deny_rds_unencrypted = false" in content
-    assert "iam_allowed_users = []" in content
+    assert "arn:aws:iam::111111111111:user/terraform-user" in content
 
 
 def test_render_root_scp_terraform_includes_saml_guardrail() -> None:
@@ -792,3 +802,60 @@ def test_the_unrendered_check_guard_can_fail(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setitem(_CHECK_REGISTRY, UnrenderedCheck.CHECK_NAME, UnrenderedCheck)
 
     assert _unrendered_scp_checks() == ["deny_ec2_unrendered"]
+
+
+def test_build_scp_terraform_module_iam_user_creation_empty_allowlist_stays_off() -> None:
+    """
+    An empty IAM user allowlist turns the policy off rather than rendering.
+
+    `iam_allowed_users = []` renders `NotResource: []`. A policy array takes
+    one or more values, so Organizations rejects the document at apply time and
+    the whole SCP fails to attach - taking the other statements in the module
+    down with it, not just this one. The covered accounts holding no IAM user
+    is an ordinary fact about them, so the module says so and generation
+    continues (INV-06).
+    """
+    org = make_org_empty()
+    rec = SCPPlacementRecommendations(
+        check_name="deny-iam-user-creation",
+        recommended_level="root",
+        target_ou_id=None,
+        affected_accounts=[],
+        compliance_percentage=100.0,
+        reasoning="test",
+    )
+    result = _build_scp_terraform_module(
+        module_name="scps_root",
+        target_id_reference="local.root_ou_id",
+        recommendations=[rec],
+        comment="Organization Root",
+        organization_hierarchy=org
+    )
+
+    assert "deny_iam_user_creation = false" in result
+    assert "iam_allowed_users" not in result
+    assert "no IAM user in the accounts this module covers" in result
+
+
+def test_build_scp_terraform_module_iam_user_creation_renders_a_populated_allowlist() -> None:
+    """The guard must not fire when the accounts did hold users."""
+    org = make_org_empty()
+    rec = SCPPlacementRecommendations(
+        check_name="deny-iam-user-creation",
+        recommended_level="root",
+        target_ou_id=None,
+        affected_accounts=[],
+        compliance_percentage=100.0,
+        reasoning="test",
+        allowed_iam_user_arns=["arn:aws:iam::111111111111:user/breakglass"],
+    )
+    result = _build_scp_terraform_module(
+        module_name="scps_root",
+        target_id_reference="local.root_ou_id",
+        recommendations=[rec],
+        comment="Organization Root",
+        organization_hierarchy=org
+    )
+
+    assert "deny_iam_user_creation = true" in result
+    assert "arn:aws:iam::111111111111:user/breakglass" in result

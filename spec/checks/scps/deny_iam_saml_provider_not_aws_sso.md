@@ -85,55 +85,13 @@ Base document shape. Summary fields beyond the common three:
 | `non_awssso_provider_count` | How many do not |
 | `allowed_provider_arn` | The single compliant provider's ARN, or `null` |
 | `violating_provider_arns` | The ARNs of the violating providers |
+| `violations` | Count. **This is the field placement reads.** |
+| `exemptions` | Count, always zero — this check produces none |
+| `compliant` | Count |
+| `compliance_percentage` | 100 for an account with no providers at all |
 
 Entry shape: `arn`, `name`, `create_date`, `valid_until`, plus
 `violation_reason` on violations only.
-
-## Known conflict: violations are invisible to placement
-
-**This check reports violations in its `violations` array but omits the
-`violations` count from its `summary`.**
-
-`build_summary_fields` returns five keys — `total_saml_providers`,
-`awssso_provider_count`, `non_awssso_provider_count`, `allowed_provider_arn`,
-and `violating_provider_arns` — and no `violations`. SCP parsing reads
-`summary.get("violations", 0)`, which therefore returns **zero for every account
-in every organization**, unconditionally.
-
-The consequence is not that the check is sometimes wrong. It is that the check
-can never hold anything back. `is_safe_for_root` in `parse_results.py` tests
-`all(r.violations == 0 for r in results)`, which is vacuously true here, so this
-check recommends the deny at **root, always** — for an organization made
-entirely of accounts it has just found non-compliant, as readily as for a clean
-one. As a safety gate it is inert.
-
-This contradicts the safety promise in
-[`../../product.md`](../../product.md) — a policy is attached only where every
-account it reaches has zero violations — and it defeats the purpose of running
-the check at all. The check's own JSON is correct: `violating_provider_arns`
-lists the offenders. Only the key placement reads is missing.
-
-The blast radius of the *generated policy* is narrower than it first appears:
-the statement denies *creating* a provider, so an existing non-compliant provider
-keeps working. What breaks is any process that recreates it —
-infrastructure-as-code that manages the provider, or a disaster-recovery rebuild.
-That is what makes this survivable rather than urgent; it does not make the
-verdict correct.
-
-Two things would resolve it, and both change behavior:
-
-1. `build_summary_fields` emits `violations`, `exemptions`, `compliant`, and
-   `compliance_percentage` like every other SCP check; or
-2. SCP parsing stops defaulting a missing `violations` key and raises instead,
-   per INV-01 — which is the treatment `unique_ami_owners` already gets.
-
-**Status: unresolved.** Recorded rather than fixed, because either resolution
-changes which policies are generated. See [`../index.md`](../index.md).
-
-`allowed_provider_arn` is likewise written and read by nothing: no field on
-`SCPCheckResult` carries it and no Terraform variable consumes it. That is a
-broken allowlist round trip (INV-07), though a harmless one, because the
-statement takes no allowlist.
 
 ## Placement and generated policy
 
@@ -141,12 +99,17 @@ statement takes no allowlist.
 |---|---|
 | Terraform variable | `deny_iam_saml_provider_not_aws_sso`, a bare boolean |
 | Allowlist variable | None. The statement takes no allowlist. |
-| Allowlist round trip | Not applicable, though `allowed_provider_arn` is written as if there were one — see the known conflict |
-| Placement input | `summary.violations`, which this check never writes |
+| Allowlist round trip | Not applicable, though `allowed_provider_arn` is written as if there were one — see limitation 4 |
+| Placement input | `summary.violations` |
 
-Placement is therefore unconditional: this check recommends root for every
-organization. See the known conflict above for why that is wrong and what would
-fix it.
+Standard SCP placement at zero violations, like every other SCP check.
+
+The count was once omitted from the summary while the offending ARNs were
+reported in `violating_provider_arns`, so parsing read zero for every account
+and the deny was recommended at root over organizations this check had just
+rejected. `test_a_wholly_non_compliant_account_does_not_parse_as_safe` pins the
+round trip through parsing rather than the summary alone, because the summary
+was never the part that was visibly wrong.
 
 ## Accepted limitations
 
@@ -157,6 +120,11 @@ fix it.
    the module, with no shared constant.
 3. An account with zero providers records nothing, which is indistinguishable in
    the result file from a check that ran and found nothing to say.
+4. **`allowed_provider_arn` is written and read by nothing.** No field on
+   `SCPCheckResult` carries it and no Terraform variable consumes it, so the
+   allowlist round trip INV-07 describes is incomplete. It is harmless here
+   because the statement takes no allowlist — the key is a record of which
+   provider was accepted, not an input to anything.
 
 ## Acceptance scenarios
 
@@ -166,12 +134,12 @@ fix it.
 3. Two providers, both named `AWSSSO_*` → two violations with
    `violation_reason: multiple_saml_providers_present`.
 4. No providers → no entries; `total_saml_providers: 0`.
-5. An account matching scenario 2 → placement currently treats it as safe. That
-   is the known conflict above, not intended behavior.
+5. An account matching scenario 2 → `summary.violations` is 1, the account is
+   not in the zero-violation subset, and placement does not clear it for root.
 
 ## Referenced invariants
 
-INV-02, INV-07 (see the known conflict).
+INV-02, INV-07 (see limitation 4).
 
 ## Implementation
 

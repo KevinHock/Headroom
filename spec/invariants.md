@@ -86,14 +86,23 @@ report never mentioned the accounts it had skipped. Pinned by
 
 ## INV-06 — An empty allowlist denies everything, so it is never rendered
 
-For a Deny statement scoped by `StringNotEquals`-style allowlist semantics, an
-empty allowlist denies every call rather than none.
+An empty allowlist is never rendered. It fails in one of two ways depending on
+where it sits, and neither is the intended policy:
+
+| Shape | Empty behavior |
+|---|---|
+| A condition allowlist, `StringNotEquals`-style | Denies every call rather than none. `deny_ec2_ami_owner`. |
+| A resource allowlist, `NotResource` | Not a valid document at all. The IAM policy grammar admits one or more values in a resource array, so Organizations rejects the whole policy at apply time — every other statement in that module with it. `deny_iam_user_creation`. |
 
 A check whose covered accounts observed no allowlist values leaves its policy
 **off**, with a comment saying why, rather than rendering an empty list. This is
 distinct from INV-01: observing nothing is a legitimate fact about those
 accounts, whereas failing to record an observation is a broken artifact and
 aborts.
+
+The second shape is the wider blast radius of the two, because the rejected
+document is the module's whole policy rather than the one statement that was
+malformed.
 
 ## INV-07 — An allowlist round trip is complete or the check does not ship
 

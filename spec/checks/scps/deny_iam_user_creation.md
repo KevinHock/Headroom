@@ -89,9 +89,11 @@ Base document shape. Summary fields beyond the common three:
 | `users` | A list of ARN **strings** — not objects |
 
 There is **no `violations` key and no `compliance_percentage` key**, which for
-this check is consistent: it produces no violations. Contrast
-[`deny_iam_saml_provider_not_aws_sso`](deny_iam_saml_provider_not_aws_sso.md),
-where the same omission is a defect.
+this check is consistent: every entry is compliant, so the zero parsing supplies
+by default is the true count. That is not a general licence to omit the key —
+[`deny_iam_saml_provider_not_aws_sso`](deny_iam_saml_provider_not_aws_sso.md)
+omitted it while producing real violations, and every account it rejected read
+back as safe until it was fixed.
 
 Entry shape in `compliant_instances`: `user_name`, `user_arn`, `path`.
 `violations` and `exemptions` are always empty.
@@ -119,24 +121,18 @@ The allowlist round trip (INV-07):
 Terraform variables: `deny_iam_user_creation` (boolean) and `iam_allowed_users`
 (list, rendered whenever the boolean is true).
 
-## Known conflict: no empty-allowlist guard
+**An empty allowlist leaves the policy off** (INV-06). When the accounts a module
+covers hold no IAM user at all, step 6 would render `iam_allowed_users = []` and
+so `NotResource: []`. The IAM policy grammar admits one or more values in a
+resource array, so an empty one is not a valid document: Organizations rejects
+the whole policy at apply time, taking every other statement in the module with
+it rather than only this one. Generation therefore emits
+`deny_iam_user_creation = false` with a comment giving the reason, logs a
+warning, and continues — an account holding no IAM user is an ordinary fact about
+that account, not a broken run.
 
-INV-06 requires that an empty allowlist is never rendered. This check does not
-honor it.
-
-When the covered accounts hold no IAM users at all, generation still emits
-`deny_iam_user_creation = true` with `iam_allowed_users = []`, producing
-`NotResource: []`. [`deny_ec2_ami_owner`](deny_ec2_ami_owner.md) guards exactly
-this case and leaves its policy off with a comment; this check has no equivalent
-guard.
-
-What AWS does with `NotResource: []` has not been measured here — it is either
-rejected as a malformed policy document at apply time, or it denies every
-`iam:CreateUser` call. Both are outcomes INV-06 exists to prevent, and neither is
-intended.
-
-**Status: unresolved.** Recorded rather than fixed, because resolving it changes
-generated policy behavior. See [`../index.md`](../index.md).
+[`deny_ec2_ami_owner`](deny_ec2_ami_owner.md) guards the identical case, and the
+two now read the same way.
 
 ## Accepted limitations
 
@@ -150,8 +146,9 @@ generated policy behavior. See [`../index.md`](../index.md).
 
 1. An account with three IAM users → three compliant entries, zero violations,
    and `summary.users` holds three ARNs.
-2. An account with no IAM users → zero entries and `total_users: 0`; see the
-   known conflict above for what generation then renders.
+2. An account with no IAM users → zero entries and `total_users: 0`, and a
+   module covering only such accounts renders `deny_iam_user_creation = false`
+   with a comment rather than an empty `NotResource`.
 3. Two accounts with different users, both placed at root → `iam_allowed_users`
    holds the sorted union of both sets.
 4. A result written with `exclude_account_ids` → the ARNs carry `REDACTED`, and
@@ -161,7 +158,7 @@ generated policy behavior. See [`../index.md`](../index.md).
 
 ## Referenced invariants
 
-INV-02, INV-06 (see the known conflict), INV-07.
+INV-02, INV-06, INV-07.
 
 ## Implementation
 
