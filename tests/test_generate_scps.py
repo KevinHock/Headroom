@@ -5,6 +5,7 @@ Covers early returns, warnings for missing targets, and name normalization edges
 """
 
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -14,6 +15,8 @@ from headroom.types import (
     OrganizationalUnit,
     SCPPlacementRecommendations,
 )
+from headroom.checks.registry import _CHECK_REGISTRY, get_check_names
+from headroom.checks.scps.deny_ec2_public_ip import DenyEc2PublicIpCheck
 from headroom.terraform import make_safe_variable_name
 from headroom.terraform.generate_scps import (
     _build_scp_terraform_module,
@@ -717,3 +720,75 @@ def test_account_level_recommendation_enables_its_policy() -> None:
     )
 
     assert "deny_ec2_imds_v1 = true" in result
+
+
+def _unrendered_scp_checks() -> List[str]:
+    """
+    Render one module with every registered SCP check and report the omissions.
+
+    Returns:
+        Registered SCP check names that produced no module parameter
+    """
+    recommendations = [
+        SCPPlacementRecommendations(
+            check_name=check_name,
+            recommended_level="root",
+            target_ou_id=None,
+            affected_accounts=[],
+            compliance_percentage=100.0,
+            reasoning="test",
+        )
+        for check_name in get_check_names("scps")
+    ]
+
+    rendered = _build_scp_terraform_module(
+        module_name="scps_root",
+        target_id_reference="local.root_ou_id",
+        recommendations=recommendations,
+        comment="Organization Root",
+        organization_hierarchy=make_org_empty(),
+    )
+
+    return [
+        check_name for check_name in get_check_names("scps")
+        if f"{check_name} = " not in rendered
+    ]
+
+
+def test_every_registered_scp_check_is_rendered() -> None:
+    """
+    A registered SCP check must reach the Terraform module.
+
+    _build_scp_terraform_module names all nine checks in straight-line code and
+    reads nothing from the registry, so a tenth check is collected, written,
+    parsed, and placed, then silently dropped at render. Nothing else in the
+    suite notices: the module renders, Terraform validates, and the operator
+    sees a policy that is simply missing a statement.
+
+    This is the SCP counterpart of test_table_covers_every_registered_rcp_check
+    (INV-13).
+    """
+    assert _unrendered_scp_checks() == []
+
+
+class UnrenderedCheck(DenyEc2PublicIpCheck):
+    """A registered SCP check the Terraform renderer has never heard of."""
+
+    CHECK_NAME = "deny_ec2_unrendered"
+
+
+def test_the_unrendered_check_guard_can_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    The guard above must report a check the renderer has never heard of.
+
+    Without this, the guard would pass just as happily if the rendered output
+    were empty or the registry lookup returned nothing, and it would be proof of
+    nothing. Registering a tenth check reproduces the exact omission it exists
+    to catch.
+
+    Delete both tests once _build_scp_terraform_module reads the registry: the
+    fake check would render, and the guard would no longer be needed.
+    """
+    monkeypatch.setitem(_CHECK_REGISTRY, UnrenderedCheck.CHECK_NAME, UnrenderedCheck)
+
+    assert _unrendered_scp_checks() == ["deny_ec2_unrendered"]
