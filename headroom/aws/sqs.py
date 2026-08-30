@@ -107,7 +107,7 @@ def _analyze_queue_policy(
         MalformedPolicyError: If Statement is neither an object nor a list
     """
     policy = json.loads(policy_json)
-    all_account_ids: Set[str] = set()
+    third_party_account_ids: Set[str] = set()
     actions_by_account: Dict[str, Set[str]] = {}
     has_wildcard_principal = False
     has_non_account_principals = False
@@ -137,17 +137,15 @@ def _analyze_queue_policy(
             has_non_account_principals or reading.has_non_account_principals
         )
 
-        account_ids = reading.account_ids
-        all_account_ids.update(account_ids)
-
         actions = _normalize_actions(statement.get("Action", []))
 
-        for account_id in account_ids:
+        for account_id in reading.account_ids:
+            if account_id in org_account_ids:
+                continue
+            third_party_account_ids.add(account_id)
             if account_id not in actions_by_account:
                 actions_by_account[account_id] = set()
             actions_by_account[account_id].update(actions)
-
-    third_party_account_ids = all_account_ids - org_account_ids
 
     return SQSQueuePolicyAnalysis(
         queue_url=queue_url,
@@ -259,8 +257,9 @@ def analyze_sqs_queue_policies(
        f. Identify wildcard principals
        g. Identify principals carrying no account ID, which no allowlist can
           preserve and which therefore block the account
-       h. Map actions to account IDs
-       i. Filter to third-party accounts (not in org)
+       h. Record third-party accounts (not in org) and the actions each may
+          take, admitting an account to both in one step so the two cannot
+          disagree
     3. Return all results with third-party access or wildcards
 
     Args:

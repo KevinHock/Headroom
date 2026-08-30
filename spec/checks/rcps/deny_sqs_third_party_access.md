@@ -106,26 +106,16 @@ Summary fields beyond the common three: `total_queues_analyzed`,
 Entry shape: `queue_url`, `queue_arn`, `region`, `third_party_account_ids`,
 `has_wildcard_principal`, `has_non_account_principals`, `actions_by_account`.
 
-**`actions_by_account` is not filtered to third parties here.** Every principal
-account is keyed into it, in-organization accounts included, so
-`actions_by_third_party_account` and `queues_by_third_party_account` in the
-summary carry in-organization account IDs despite their names. ECR, KMS, S3, and
-Secrets Manager all filter. Nothing downstream reads these fields — the allowlist
-comes from `unique_third_party_accounts`, which **is** filtered — so this is a
-reporting defect, not a policy defect.
+`actions_by_account` is filtered to third-party accounts, as it is in ECR, KMS,
+S3, and Secrets Manager. The organization filter runs where an account is
+admitted rather than over a set collected first, so the entry's account set and
+its action map cannot disagree, and the summary's
+`actions_by_third_party_account` and `queues_by_third_party_account` hold what
+their names say.
 
 `has_non_account_principals` is always `false` on a returned entry, for the same
 reason as in
 [`deny_secrets_manager_third_party_access`](deny_secrets_manager_third_party_access.md).
-
-## Known conflict: the third-party action map counts in-organization accounts
-
-`actions_by_third_party_account` and `queues_by_third_party_account` carry
-in-organization account IDs, as described under Result contract above. A
-reporting defect only: the allowlist is built from `unique_third_party_accounts`,
-which is filtered, and nothing downstream reads the unfiltered fields.
-
-**Status: unresolved.** Conflict 6 in [`../index.md`](../index.md).
 
 ## Placement and generated policy
 
@@ -134,12 +124,11 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. `actions_by_third_party_account` includes in-organization accounts.
-2. `Condition`, `Resource`, and `NotAction` are not evaluated.
-3. The queue-level filter for third-party or wildcard findings lives in the
+1. `Condition`, `Resource`, and `NotAction` are not evaluated.
+2. The queue-level filter for third-party or wildcard findings lives in the
    check's `analyze`, not in the analyzer, which appends every queue that has a
    policy.
-4. AWS documents federated principals only for role trust policies, so a
+3. AWS documents federated principals only for role trust policies, so a
    `Federated` principal in a queue policy may grant nothing at all. It is still
    counted as a blocker, because whether the grant is live is not readable from
    the document and INV-01 forbids assuming it is not.
@@ -148,8 +137,8 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 1. A queue policy granting `111111111111`, outside the organization → compliant,
    and the account enters the allowlist.
-2. The same, where the account is in the organization → not recorded, but the
-   account **does** appear in `actions_by_third_party_account`; see limitation 2.
+2. The same, where the account is in the organization → not recorded anywhere:
+   neither in `third_party_account_ids` nor in `actions_by_account`.
 3. A queue policy with `Principal: "*"` → violation; the account is blocked for
    SQS only.
 4. A queue with no `Policy` attribute → skipped.

@@ -90,8 +90,7 @@ which side is right.
 
 **The numbers are stable identifiers, not positions.** They are cited from the
 check documents, so a resolved conflict leaves its number retired rather than
-renumbering the rest. Six are retired, which is why one row is left and it is
-numbered 6:
+renumbering the rest. Seven are retired and none is open:
 
 | Retired | Was | Fixed by |
 |---|---|---|
@@ -101,10 +100,10 @@ numbered 6:
 | 4 | ECR, KMS, Secrets Manager, and SQS aborted the run on a `Federated` principal, where S3 recorded it | All five now record it as a violation, through one reader, `read_principal` |
 | 4b | `deny_sqs_third_party_access` skipped a queue naming a `CanonicalUser` principal, clearing the account | Same reader: `CanonicalUser` is a documented principal type and now blocks the account like any other principal no allowlist can carry |
 | 5 | `deny_eks_create_cluster_without_tag` matched the tag key case-sensitively | Both tag checks now share one reader, `find_tag_value_as_iam_matches` |
+| 6 | `deny_sqs_third_party_access` keyed in-organization accounts into `actions_by_third_party_account` | The organization filter now runs where an account is admitted, as it does in the other four analyzers |
 
 | # | Where | Conflict |
 |---|---|---|
-| 6 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | `actions_by_third_party_account` includes in-organization accounts. A reporting defect only; the allowlist is built from a filtered field. |
 
 Two further gaps are recorded where they belong rather than here, because they
 are limitations of the design rather than disagreements with it: KMS grants are

@@ -229,6 +229,70 @@ class TestAnalyzeSQSQueuePolicies:
         assert results[0].actions_by_account["333333333333"] == {"sqs:SendMessage"}
         assert results[0].actions_by_account["444444444444"] == {"sqs:ReceiveMessage"}
 
+    def test_an_in_organization_grantee_is_not_recorded(self) -> None:
+        """
+        A grant to an account inside the organization is not a finding.
+
+        The queue is still returned for the third party it also grants to,
+        but the in-organization account belongs in neither the account set
+        nor the action map. Keying it into the action map is what fed
+        in-organization IDs into `actions_by_third_party_account` and
+        `queues_by_third_party_account`, whose names promise the opposite.
+        """
+        mock_session = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_sqs_client = MagicMock()
+
+        mock_session.client.side_effect = lambda service, **kwargs: {
+            "ec2": mock_ec2_client,
+            "sqs": mock_sqs_client,
+        }.get(service)
+
+        mock_ec2_client.describe_regions.return_value = {
+            "Regions": [{"RegionName": "us-east-1"}]
+        }
+
+        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/shared-queue"
+        queue_arn = "arn:aws:sqs:us-east-1:111111111111:shared-queue"
+
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {"QueueUrls": [queue_url]}
+        ]
+        mock_sqs_client.get_paginator.return_value = paginator
+
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "arn:aws:iam::555555555555:root"},
+                    "Action": "sqs:SendMessage",
+                    "Resource": queue_arn
+                },
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "arn:aws:iam::222222222222:root"},
+                    "Action": "sqs:ReceiveMessage",
+                    "Resource": queue_arn
+                }
+            ]
+        }
+
+        mock_sqs_client.get_queue_attributes.return_value = {
+            "Attributes": {
+                "Policy": json.dumps(policy),
+                "QueueArn": queue_arn
+            }
+        }
+
+        org_account_ids = {"111111111111", "555555555555"}
+        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+
+        assert len(results) == 1
+        assert results[0].third_party_account_ids == {"222222222222"}
+        assert results[0].actions_by_account == {"222222222222": {"sqs:ReceiveMessage"}}
+
     def test_multi_region_queues(self) -> None:
         """Test analyzing queues across multiple regions."""
         mock_session = MagicMock()
