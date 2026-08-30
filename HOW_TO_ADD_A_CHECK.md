@@ -538,8 +538,30 @@ def _analyze_policies_in_region(
                 policy_str = policy_response.get("{PolicyKey}", "{}")
                 policy = json.loads(policy_str)
 
-                # Extract account IDs from policy
-                all_account_ids = _extract_account_ids_from_policy(policy)
+                # Read every Allow statement's Principal through the one
+                # shared reader. Do not write your own: see AP-007.
+                all_account_ids: Set[str] = set()
+                has_wildcard = False
+                has_non_account_principals = False
+
+                for statement in normalize_statements(policy, resource_description):
+                    if statement.get("Effect") != "Allow":
+                        continue
+                    if has_not_principal(statement):
+                        has_wildcard = True
+                        continue
+                    principal = statement.get("Principal")
+                    if not principal:
+                        continue
+
+                    reading = read_principal(
+                        principal, RESOURCE_POLICY_PRINCIPAL_TYPES, resource_description
+                    )
+                    all_account_ids.update(reading.account_ids)
+                    has_wildcard = has_wildcard or reading.has_wildcard
+                    has_non_account_principals = (
+                        has_non_account_principals or reading.has_non_account_principals
+                    )
 
                 # Identify third-party (non-org) accounts
                 third_party_ids = all_account_ids - org_account_ids
@@ -548,6 +570,8 @@ def _analyze_policies_in_region(
                     resource_arn=resource["{ArnKey}"],
                     all_account_ids=all_account_ids,
                     third_party_account_ids=third_party_ids,
+                    has_wildcard_principal=has_wildcard,
+                    has_non_account_principals=has_non_account_principals,
                     region=region,
                 )
                 results.append(result)
@@ -557,50 +581,18 @@ def _analyze_policies_in_region(
                 continue
 
     return results
-
-
-def _extract_account_ids_from_policy(policy: dict) -> Set[str]:
-    """
-    Extract all AWS account IDs from IAM policy.
-
-    Handles various principal formats:
-    - String: "arn:aws:iam::111111111111:root"
-    - Dict: {"AWS": "arn:aws:iam::111111111111:root"}
-    - List: {"AWS": ["arn:aws:iam::111111111111:root"]}
-    """
-    account_ids = set()
-
-    for statement in policy.get("Statement", []):
-        principal = statement.get("Principal", {})
-
-        if isinstance(principal, str):
-            account_ids.update(_extract_from_string(principal))
-        elif isinstance(principal, dict):
-            for key, value in principal.items():
-                if isinstance(value, str):
-                    account_ids.update(_extract_from_string(value))
-                elif isinstance(value, list):
-                    for item in value:
-                        account_ids.update(_extract_from_string(item))
-
-    return account_ids
-
-
-def _extract_from_string(principal: str) -> Set[str]:
-    """Extract account ID from principal string."""
-    account_ids = set()
-
-    # Match ARN format
-    arn_match = re.match(AWS_ARN_ACCOUNT_ID_PATTERN, principal)
-    if arn_match:
-        account_ids.add(arn_match.group(1))
-
-    # Match raw account ID (12 digits)
-    elif re.match(r'^\d{12}$', principal):
-        account_ids.add(principal)
-
-    return account_ids
 ```
+
+`has_wildcard_principal` and `has_non_account_principals` are two ways of saying
+the same thing, and the check must categorize either as a `VIOLATION`: an
+allowlist keyed on `aws:PrincipalAccount` can carry neither, so the RCP would
+deny a grant that exists today. Filter on both in `analyze` as well, or a
+resource whose only finding is the second is discarded before it is counted.
+
+Let `UnknownPrincipalTypeError` propagate. Every analyzer aborts the run on a
+principal key AWS does not document, and catching it clears the account on the
+strength of a resource nobody read. That was conflict 4b. See
+[`spec/contracts/policy-model.md`](spec/contracts/policy-model.md).
 
 **Variables:**
 - `{service}`: `sqs`
@@ -791,9 +783,13 @@ regions = get_all_regions(session)
 # ❌ BAD - Duplicated regex across files
 arn_match = re.match(r'^arn:aws:[^:]+:[^:]*:(\d{12}):', principal)
 
-# ✅ GOOD - Use constant
-from ..constants import AWS_ARN_ACCOUNT_ID_PATTERN
-arn_match = re.match(AWS_ARN_ACCOUNT_ID_PATTERN, principal)
+# ❌ STILL BAD - your own walk over the Principal element
+if isinstance(principal, dict) and "AWS" in principal:
+    ...
+
+# ✅ GOOD - one reader, for every analyzer
+from .policy_documents import RESOURCE_POLICY_PRINCIPAL_TYPES, read_principal
+reading = read_principal(principal, RESOURCE_POLICY_PRINCIPAL_TYPES, description)
 ```
 
 The copies drift, and they drift narrower. `roles.py`, `kms.py` and `ecr.py`
@@ -801,6 +797,14 @@ each carried `r'^arn:aws:iam::(\d{12}):'` while `s3.py`, `sqs.py` and
 `secretsmanager.py` used the constant. The three copies silently dropped every
 STS session principal and every non-commercial partition, so the accounts
 never reached the allowlist and the RCP denied them.
+
+The regex was the first half of that lesson and the whole `Principal` walk was
+the second. Six analyzers each carried their own, and they diverged on more than
+a pattern: which principal types they permitted, whether an unreadable one
+aborted the run or was skipped, and whether one carrying no account ID was a
+finding at all. Four answers to one question, recorded as conflicts 4 and 4b.
+`read_principal` in `headroom/aws/policy_documents.py` is now the only place a
+`Principal` element is interpreted; call it rather than writing the walk again.
 
 ---
 

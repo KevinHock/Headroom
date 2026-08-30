@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_s3_third_party_access.py
   - headroom/aws/s3.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -14,6 +15,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_s3_third_party_access.py
   - tests/test_aws_s3.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_s3_third_party_access
@@ -59,8 +61,11 @@ are listed once, not per region.
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`. The
 bucket ARN is synthesized as `arn:aws:s3:::<name>`.
 
-Permitted principal types are `AWS`, `Service`, `Federated`, and
-`CanonicalUser` — S3 is the only analyzer that accepts `CanonicalUser`.
+The `Principal` element is read by `read_principal` against
+`RESOURCE_POLICY_PRINCIPAL_TYPES`
+([`../../contracts/policy-model.md`](../../contracts/policy-model.md)). S3 is the
+service AWS documents `CanonicalUser` for, and it is why that key is in the
+resource-policy set at all.
 
 ## Decision table
 
@@ -72,11 +77,13 @@ Permitted principal types are `AWS`, `Service`, `Federated`, and
 | Exemption | — | Never produced |
 | Not recorded | Only in-organization principals or AWS services | Not in the output |
 
-**S3 is the only check that records `Federated` and `CanonicalUser` principals as
-findings rather than aborting.** They carry no account ID, so no allowlist can
-express them, and they block the account exactly as a wildcard does. Every other
-RCP analyzer raises on them; this one reports them, which is the more useful
-behavior and the one the others should converge on.
+S3 was the only check that recorded `Federated` and `CanonicalUser` principals
+as findings rather than aborting, and it was right: they carry no account ID, so
+no allowlist can express them, and they block the account exactly as a wildcard
+does. The other four resource-policy analyzers raised instead, which was
+conflict 4. They have converged on this behavior, and the rule now lives in
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md) rather than
+here.
 
 ## Failure behavior
 
@@ -87,11 +94,11 @@ behavior and the one the others should converge on.
 | Any other `ClientError` on one bucket, `AccessDenied` included | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
-| A principal key outside the four permitted types | `UnknownPrincipalTypeError`, aborting the run |
+| A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
-`UnsupportedPrincipalTypeError` is declared in this module and never raised.
-That is not an oversight: it is the mechanism the other four analyzers use, and
-S3 deliberately does not.
+`UnsupportedPrincipalTypeError` was declared in this module and never raised —
+the mechanism the other four analyzers used and S3 deliberately did not. None of
+the five raises it now, and the class is gone from all of them.
 
 ## Result contract
 
@@ -149,6 +156,7 @@ INV-01, INV-02, INV-04, INV-06, INV-13.
 
 - `headroom/checks/rcps/deny_s3_third_party_access.py`
 - `headroom/aws/s3.py` — `analyze_s3_bucket_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_s3_third_party_access.py`,
-  `tests/test_aws_s3.py`
+  `tests/test_aws_s3.py`, `tests/test_aws_policy_documents.py`

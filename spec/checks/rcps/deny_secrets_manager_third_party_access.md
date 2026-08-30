@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_secrets_manager_third_party_access.py
   - headroom/aws/secretsmanager.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -15,6 +16,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_secrets_manager_third_party_access.py
   - tests/test_aws_secretsmanager.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_secrets_manager_third_party_access
@@ -60,17 +62,20 @@ Per enabled region: `secretsmanager:ListSecrets` (paginated), then
 `secretsmanager:GetResourcePolicy` per secret.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
-Permitted principal types are `AWS`, `Service`, and `Federated`.
+The `Principal` element is read by `read_principal` against
+`RESOURCE_POLICY_PRINCIPAL_TYPES`
+([`../../contracts/policy-model.md`](../../contracts/policy-model.md)).
 
 ## Decision table
 
 | State | Condition | Category |
 |---|---|---|
 | Violation | A wildcard principal — literal `*`, or an `Allow` with `NotPrincipal` | `VIOLATION` |
+| Violation | A `Federated` or `CanonicalUser` principal | `VIOLATION` |
 | Compliant | Third-party account IDs only | `COMPLIANT` |
 | Exemption | — | Never produced |
 | Not recorded | Only in-organization principals or AWS services | Not in the output |
-| Aborts | A `Federated` or `CanonicalUser` principal | The run aborts |
+| Aborts | A principal key AWS does not document | The run aborts |
 
 ## Failure behavior
 
@@ -82,24 +87,16 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | `ClientError` listing secrets in any region | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
-| A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| A `CanonicalUser` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| Any other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
+| A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 | An `Action` that is neither a string nor a list | `TypeError` |
 
-## Known conflict: aborting on a `Federated` or `CanonicalUser` principal
-
-The divergence described in
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) applies here and
-reaches one principal type further. This check tests for both types before it
-extracts account IDs, so a `CanonicalUser` raises `UnsupportedPrincipalTypeError`
-here where ECR and KMS reach `UnknownPrincipalTypeError` instead. The outcome is
-the same — the run stops — and
-[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records both types
-as violations.
-
-**Status: unresolved.** Recorded rather than fixed, because changing it changes
-which policies are generated. Conflict 4 in [`../index.md`](../index.md).
+A `Federated` or `CanonicalUser` principal used to raise
+`UnsupportedPrincipalTypeError` here and stop the whole run — conflict 4. This
+check reached it one principal type further than ECR and KMS did, because it
+tested for both types before extracting account IDs. All three now record the
+principal as a violation: it carries no account ID, so the allowlist cannot
+preserve it and the account must not take this RCP. The rule is stated once in
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
 
@@ -118,10 +115,13 @@ Summary fields beyond the common three: `total_secrets_analyzed`,
 Entry shape: `secret_name`, `secret_arn`, `third_party_account_ids`,
 `has_wildcard_principal`, `has_non_account_principals`, `actions_by_account`.
 
-**`has_non_account_principals` is always `false` on a returned entry.** The
-analyzer sets the flag and then raises unconditionally, so the check's
-`has_non_account_principals` violation branch is unreachable through the real
-pipeline. The field is part of the wire format and is kept.
+`has_non_account_principals` carries the verdict rather than decorating it: it
+is the field that makes a secret naming a `Federated` or `CanonicalUser`
+principal a violation. It was dead while the analyzer raised instead of setting
+it, and resolving conflict 4 is what brought it into use.
+
+`secrets_with_wildcards` counts every violation, so a secret blocked only by a
+principal carrying no account ID is counted there despite the name.
 
 ## Placement and generated policy
 
@@ -130,8 +130,10 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. A `Federated` principal aborts rather than blocking, and the
-   `has_non_account_principals` field that would record it is therefore dead.
+1. AWS documents federated principals only for role trust policies, so a
+   `Federated` principal in a secret's resource policy may grant nothing at all.
+   It is still counted as a blocker, because whether the grant is live is not
+   readable from the document and INV-01 forbids assuming it is not.
 2. `Condition`, `Resource`, and `NotAction` are not evaluated.
 3. A replica secret is enumerated separately in each region it replicates to, so
    one logical secret can produce several findings.
@@ -148,7 +150,11 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
    Secrets Manager only.
 4. A secret with no resource policy → skipped.
 5. A secret with an empty policy string → skipped.
-6. A secret policy with a `Federated` principal → the run aborts.
+6. A secret policy with a `Federated` or `CanonicalUser` principal → violation;
+   the account is blocked for Secrets Manager, and the remaining secrets are
+   still read.
+7. A secret policy naming a principal key AWS does not document → the run
+   aborts.
 
 ## Referenced invariants
 
@@ -158,7 +164,8 @@ INV-01, INV-02, INV-04, INV-06, INV-13, INV-16.
 
 - `headroom/checks/rcps/deny_secrets_manager_third_party_access.py`
 - `headroom/aws/secretsmanager.py` — `analyze_secrets_manager_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `headroom/terraform/generate_rcps.py` — `RCP_TERRAFORM_VARIABLES`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_secrets_manager_third_party_access.py`,
-  `tests/test_aws_secretsmanager.py`
+  `tests/test_aws_secretsmanager.py`, `tests/test_aws_policy_documents.py`

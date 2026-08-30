@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_sts_third_party_assumerole.py
   - headroom/aws/iam/roles.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -14,6 +15,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_sts_third_party_assumerole.py
   - tests/test_aws_iam.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_sts_third_party_assumerole
@@ -108,11 +110,25 @@ principal is not a third party.
 | `Statement` neither object nor list | `MalformedPolicyError` |
 | Both or neither of `Action`/`NotAction` on an `Allow` | `MalformedStatementError` |
 | A `Federated` principal granted the literal `sts:AssumeRole` | `InvalidFederatedPrincipalError`, aborting the run |
-| A principal key outside `AWS`, `Service`, `Federated` — `CanonicalUser` included | `UnknownPrincipalTypeError`, aborting the run |
+| A principal key outside `TRUST_POLICY_PRINCIPAL_TYPES` — `CanonicalUser` included | `UnknownPrincipalTypeError`, aborting the run |
 
 The `Federated` check is an exact-membership test on the declared actions, not a
 wildcard match. That is deliberate: it fires only on the unambiguous case rather
 than on every `sts:*` grant to a federated principal.
+
+### Why a `Federated` principal is otherwise no finding here
+
+The five resource-policy analyzers count a `Federated` principal as a blocker,
+because it carries no account ID and their RCPs deny a whole service. This one
+denies `sts:AssumeRole` alone, and a federated identity cannot call it — AWS
+routes federation through `AssumeRoleWithSAML` and `AssumeRoleWithWebIdentity`.
+So the grant this RCP could break is not one a `Federated` principal holds, and
+`read_principal` reports the fact while this analyzer alone ignores it.
+
+`CanonicalUser` is a different matter: it is an Amazon S3 identifier and cannot
+name who may assume a role, so `TRUST_POLICY_PRINCIPAL_TYPES` does not accept
+the key and it aborts as an undocumented one. See
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
 
@@ -153,6 +169,8 @@ an account is blocked at `violations > 0`; the allowlist is the union of
    allowlist.
 3. A `CanonicalUser` principal aborts the run rather than being recorded as a
    blocker, unlike [`deny_s3_third_party_access`](deny_s3_third_party_access.md).
+   A trust policy does not accept the key, so the case should not arise; if it
+   does, the document is one AWS should not have stored.
 
 ## Acceptance scenarios
 
@@ -180,7 +198,8 @@ INV-01, INV-02, INV-04, INV-06, INV-13.
 - `headroom/checks/rcps/deny_sts_third_party_assumerole.py` — class
   `ThirdPartyAssumeRoleCheck`
 - `headroom/aws/iam/roles.py` — `analyze_iam_roles_trust_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `headroom/constants.py` — `AWS_ARN_ACCOUNT_ID_PATTERN`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_sts_third_party_assumerole.py`,
-  `tests/test_aws_iam.py`
+  `tests/test_aws_iam.py`, `tests/test_aws_policy_documents.py`

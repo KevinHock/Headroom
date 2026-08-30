@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_ecr_third_party_access.py
   - headroom/aws/ecr.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -15,6 +16,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_ecr_third_party_access.py
   - tests/test_aws_ecr.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_ecr_third_party_access
@@ -54,17 +56,20 @@ Per enabled region: `ecr:DescribeRepositories` (paginated), then
 `ecr:GetRepositoryPolicy` per repository.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
-Permitted principal types are `AWS` and `Service`.
+The `Principal` element is read by `read_principal` against
+`RESOURCE_POLICY_PRINCIPAL_TYPES`
+([`../../contracts/policy-model.md`](../../contracts/policy-model.md)).
 
 ## Decision table
 
 | State | Condition | Category |
 |---|---|---|
 | Violation | A wildcard principal — literal `*`, or an `Allow` with `NotPrincipal` | `VIOLATION` |
+| Violation | A `Federated` or `CanonicalUser` principal | `VIOLATION` |
 | Compliant | Third-party account IDs only | `COMPLIANT` |
 | Exemption | — | Never produced |
 | Not recorded | Only in-organization principals or AWS services | Not in the output |
-| Aborts | A `Federated` or `CanonicalUser` principal | The run aborts; see below |
+| Aborts | A principal key AWS does not document | The run aborts |
 
 ## Failure behavior
 
@@ -75,18 +80,14 @@ Permitted principal types are `AWS` and `Service`.
 | `ClientError` in any region | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
-| A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| A `CanonicalUser` or other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
+| A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
-## Known conflict: aborting on a `Federated` principal
-
-Such a principal carries no account ID and so blocks the account, exactly as a
-wildcard does — [`deny_s3_third_party_access`](deny_s3_third_party_access.md)
-records that as a violation and lets the rest of the organization generate,
-while this check stops the whole run. Reporting is the better behavior.
-
-**Status: unresolved.** Recorded rather than fixed, because changing it changes
-which policies are generated. Conflict 4 in [`../index.md`](../index.md).
+A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
+run — conflict 4. It is now a violation: the principal carries no account ID, so
+the allowlist cannot preserve it and the account must not take this RCP, which
+is what recording a violation says. Aborting said the same thing at the cost of
+every other account's results. The rule is stated once in
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
 
@@ -103,9 +104,14 @@ Summary fields beyond the common three: `total_repositories_analyzed`,
 `actions_by_account`.
 
 Entry shape: `repository_name`, `repository_arn`, `region`,
-`third_party_account_ids`, `actions_by_account`, `has_wildcard_principal`.
+`third_party_account_ids`, `actions_by_account`, `has_wildcard_principal`,
+`has_non_account_principals`.
 
 `actions_by_account` is filtered to third-party accounts.
+
+`repositories_with_wildcards` counts every violation, so a repository blocked
+only by a principal carrying no account ID is counted there despite the name.
+The same is true of the S3 and SQS fields of that shape.
 
 ## Placement and generated policy
 
@@ -117,10 +123,13 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 1. The registry-level policy is unread, so cross-account replication configured
    there is invisible.
 2. `Condition`, `Resource`, and `NotAction` are not evaluated.
-3. A `Federated` principal aborts rather than blocking; see Failure behavior.
-4. An `Action` that is neither a string nor a list yields no actions rather than
+3. An `Action` that is neither a string nor a list yields no actions rather than
    raising, so a malformed action silently contributes nothing to
    `actions_by_account`. The account still enters the allowlist.
+4. AWS documents federated principals only for role trust policies, so a
+   `Federated` principal in a repository policy may grant nothing at all. It is
+   still counted as a blocker, because whether the grant is live is not readable
+   from the document and INV-01 forbids assuming it is not.
 
 ## Acceptance scenarios
 
@@ -131,7 +140,12 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
    for ECR only.
 4. A repository with no policy → recorded as granting nothing.
 5. A `Deny` statement naming a third party → not recorded; only `Allow` grants.
-6. A repository policy with a `Federated` principal → the run aborts.
+6. A repository policy with a `Federated` principal → violation; the account is
+   blocked for ECR, and the remaining repositories are still read.
+7. A repository policy with a `CanonicalUser` principal → violation, on the same
+   grounds.
+8. A repository policy naming a principal key AWS does not document → the run
+   aborts.
 
 ## Referenced invariants
 
@@ -141,6 +155,7 @@ INV-01, INV-02, INV-04, INV-06, INV-13, INV-16.
 
 - `headroom/checks/rcps/deny_ecr_third_party_access.py`
 - `headroom/aws/ecr.py` — `analyze_ecr_repository_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_ecr_third_party_access.py`,
-  `tests/test_aws_ecr.py`
+  `tests/test_aws_ecr.py`, `tests/test_aws_policy_documents.py`

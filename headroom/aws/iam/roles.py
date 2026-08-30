@@ -16,15 +16,15 @@ from boto3.session import Session
 from botocore.exceptions import ClientError
 from mypy_boto3_iam.client import IAMClient
 
-from ...constants import AWS_ARN_ACCOUNT_ID_PATTERN, BASE_PRINCIPAL_TYPES
-from ..policy_documents import has_not_principal, normalize_statements
+from ..policy_documents import (
+    TRUST_POLICY_PRINCIPAL_TYPES,
+    has_not_principal,
+    normalize_statements,
+    read_principal,
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-class UnknownPrincipalTypeError(Exception):
-    """Raised when an unknown principal type is encountered in a trust policy."""
 
 
 class InvalidFederatedPrincipalError(Exception):
@@ -34,8 +34,6 @@ class InvalidFederatedPrincipalError(Exception):
 class MalformedStatementError(Exception):
     """Raised when a trust policy statement names neither or both action keys."""
 
-
-ALLOWED_PRINCIPAL_TYPES = BASE_PRINCIPAL_TYPES
 
 ASSUME_ROLE_ACTION = "sts:AssumeRole"
 
@@ -57,56 +55,6 @@ class TrustPolicyAnalysis:
     role_arn: str
     third_party_account_ids: Set[str]
     has_wildcard_principal: bool
-
-
-def _extract_account_ids_from_principal(principal: Any) -> Set[str]:
-    """
-    Extract AWS account IDs from an IAM policy principal.
-
-    Args:
-        principal: Principal field from IAM policy statement (can be string, list, or dict)
-
-    Returns:
-        Set of extracted account IDs (12-digit strings)
-    """
-    account_ids: Set[str] = set()
-
-    if isinstance(principal, str):
-        # Handle wildcard
-        if principal == "*":
-            return set()
-        # Extract the account ID from any principal ARN, whatever its
-        # partition or service. A trust policy principal can be an STS
-        # session ARN as well as an IAM one.
-        arn_match = re.match(AWS_ARN_ACCOUNT_ID_PATTERN, principal)
-        if arn_match:
-            account_ids.add(arn_match.group(1))
-        else:
-            # If not an ARN, check if it's a plain 12-digit account ID
-            if re.match(r'^\d{12}$', principal):
-                account_ids.add(principal)
-    elif isinstance(principal, list):
-        for item in principal:
-            account_ids.update(_extract_account_ids_from_principal(item))
-    elif isinstance(principal, dict):
-        # Validate that all principal types are known
-        unknown_types = set(principal.keys()) - ALLOWED_PRINCIPAL_TYPES
-        if unknown_types:
-            raise UnknownPrincipalTypeError(
-                f"Unknown principal type(s) found: {unknown_types}. "
-                f"Expected one of: {ALLOWED_PRINCIPAL_TYPES}"
-            )
-
-        # Process AWS principals to extract account IDs
-        if "AWS" in principal:
-            value = principal["AWS"]
-            if isinstance(value, str):
-                account_ids.update(_extract_account_ids_from_principal(value))
-            elif isinstance(value, list):
-                for item in value:
-                    account_ids.update(_extract_account_ids_from_principal(item))
-
-    return account_ids
 
 
 def _action_pattern_matches(pattern: str, action: str) -> bool:
@@ -167,30 +115,6 @@ def _grants_assume_role(statement: Any, role_name: str) -> bool:
     covered = any(_action_pattern_matches(p, ASSUME_ROLE_ACTION) for p in patterns)
 
     return covered if has_action else not covered
-
-
-def _has_wildcard_principal(principal: Any) -> bool:
-    """
-    Check if principal contains a wildcard.
-
-    Args:
-        principal: Principal field from IAM policy statement
-
-    Returns:
-        True if principal contains wildcard
-    """
-    if isinstance(principal, str):
-        return principal == "*"
-    elif isinstance(principal, list):
-        return any(_has_wildcard_principal(item) for item in principal)
-    elif isinstance(principal, dict):
-        for key, value in principal.items():
-            if key == "AWS":
-                if isinstance(value, str) and value == "*":
-                    return True
-                if isinstance(value, list) and any(item == "*" for item in value):
-                    return True
-    return False
 
 
 def analyze_iam_roles_trust_policies(
@@ -281,16 +205,22 @@ def analyze_iam_roles_trust_policies(
                                 f"Federated principals should use sts:AssumeRoleWithSAML or sts:AssumeRoleWithWebIdentity."
                             )
 
-                    # Check for wildcard
-                    if _has_wildcard_principal(principal):
+                    # A trust policy is not a resource policy, so the
+                    # permitted principal keys are the trust-policy set: a
+                    # canonical user ID is an Amazon S3 identifier and cannot
+                    # appear here. A Federated principal can and does, which
+                    # is why `has_non_account_principals` is read but not
+                    # acted on - see the Federated gate above.
+                    reading = read_principal(
+                        principal, TRUST_POLICY_PRINCIPAL_TYPES, f"Role '{role_name}'"
+                    )
+
+                    if reading.has_wildcard:
                         has_wildcard = True
                         # TODO: Check CloudTrail logs to find which accounts actually assume this role
 
-                    # Extract account IDs
-                    account_ids = _extract_account_ids_from_principal(principal)
-
                     # Filter to only third-party accounts (not in org)
-                    for account_id in account_ids:
+                    for account_id in reading.account_ids:
                         if account_id not in org_account_ids:
                             third_party_accounts.add(account_id)
 

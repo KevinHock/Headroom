@@ -11,6 +11,7 @@ from typing import Generator, List
 from headroom.checks.rcps.deny_ecr_third_party_access import DenyECRThirdPartyAccessCheck
 from headroom.constants import DENY_ECR_THIRD_PARTY_ACCESS
 from headroom.aws.ecr import ECRRepositoryPolicyAnalysis
+from headroom.enums import CheckCategory
 
 
 class TestCheckDenyECRThirdPartyAccess:
@@ -468,3 +469,75 @@ class TestCheckDenyECRThirdPartyAccess:
         for account_id, actions in result_dict["actions_by_account"].items():
             assert isinstance(actions, list)
             assert actions == sorted(actions)
+
+    def test_a_non_account_principal_is_a_violation(
+        self,
+        temp_results_dir: str,
+        org_account_ids: set[str],
+    ) -> None:
+        """
+        A repository naming a principal with no account ID blocks the account.
+
+        The allowlist is a list of account IDs. A principal that has none
+        cannot appear on it, so attaching the RCP would deny access the
+        repository policy grants today - the same reasoning that makes a
+        wildcard a violation.
+        """
+        check = DenyECRThirdPartyAccessCheck(
+            check_name=DENY_ECR_THIRD_PARTY_ACCESS,
+            account_name="test-account",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+            org_account_ids=org_account_ids,
+        )
+
+        category, result_dict = check.categorize_result(
+            ECRRepositoryPolicyAnalysis(
+                repository_name="federated-repo",
+                repository_arn="arn:aws:ecr:us-east-1:111111111111:repository/federated-repo",
+                region="us-east-1",
+                third_party_account_ids=set(),
+                actions_by_account={},
+                has_wildcard_principal=False,
+                has_non_account_principals=True,
+            )
+        )
+
+        assert category == CheckCategory.VIOLATION
+        assert result_dict["has_non_account_principals"] is True
+
+    def test_a_non_account_principal_alone_keeps_the_repository(
+        self,
+        temp_results_dir: str,
+        org_account_ids: set[str],
+    ) -> None:
+        """
+        The check's own filter must not drop the finding before it is counted.
+
+        A repository whose only finding is a principal with no account ID has
+        no third-party account IDs and no wildcard, so a filter reading only
+        those two would discard the very entry that blocks the account.
+        """
+        check = DenyECRThirdPartyAccessCheck(
+            check_name=DENY_ECR_THIRD_PARTY_ACCESS,
+            account_name="test-account",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+            org_account_ids=org_account_ids,
+        )
+
+        analysis = ECRRepositoryPolicyAnalysis(
+            repository_name="federated-repo",
+            repository_arn="arn:aws:ecr:us-east-1:111111111111:repository/federated-repo",
+            region="us-east-1",
+            third_party_account_ids=set(),
+            actions_by_account={},
+            has_wildcard_principal=False,
+            has_non_account_principals=True,
+        )
+
+        with patch(
+            "headroom.checks.rcps.deny_ecr_third_party_access.analyze_ecr_repository_policies",
+            return_value=[analysis],
+        ):
+            assert check.analyze(MagicMock()) == [analysis]

@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_kms_third_party_access.py
   - headroom/aws/kms.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -15,6 +16,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_kms_third_party_access.py
   - tests/test_aws_kms.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_kms_third_party_access
@@ -59,17 +61,20 @@ Per enabled region: `kms:ListKeys` (paginated), then `kms:GetKeyPolicy` with
 `PolicyName="default"` per key.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
-Permitted principal types are `AWS`, `Service`, and `Federated`.
+The `Principal` element is read by `read_principal` against
+`RESOURCE_POLICY_PRINCIPAL_TYPES`
+([`../../contracts/policy-model.md`](../../contracts/policy-model.md)).
 
 ## Decision table
 
 | State | Condition | Category |
 |---|---|---|
 | Violation | A wildcard principal — literal `*`, or an `Allow` with `NotPrincipal` | `VIOLATION` |
+| Violation | A `Federated` or `CanonicalUser` principal | `VIOLATION` |
 | Compliant | Third-party account IDs only | `COMPLIANT` |
 | Exemption | — | Never produced |
 | Not recorded | Only in-organization principals or AWS services | Not in the output |
-| Aborts | A `Federated` or `CanonicalUser` principal | The run aborts |
+| Aborts | A principal key AWS does not document | The run aborts |
 
 Every KMS key policy names its own account's root principal, which is an
 in-organization principal and so is never recorded.
@@ -83,20 +88,15 @@ in-organization principal and so is never recorded.
 | `ClientError` in any region | Logged and re-raised, aborting the run |
 | Unparseable policy JSON | Not caught; propagates and aborts |
 | `Statement` neither object nor list | `MalformedPolicyError` |
-| A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| A `CanonicalUser` or other unrecognized principal key | `UnknownPrincipalTypeError`, aborting the run |
+| A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
-## Known conflict: aborting on a `Federated` principal
-
-The same divergence as
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md), for the same
-reason: the principal carries no account ID, so it blocks the account exactly as
-a wildcard does, and
-[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records that
-rather than stopping the run.
-
-**Status: unresolved.** Recorded rather than fixed, because changing it changes
-which policies are generated. Conflict 4 in [`../index.md`](../index.md).
+A `Federated` or `CanonicalUser` principal used to raise here and stop the whole
+run — conflict 4, the same divergence as
+[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md) and resolved the
+same way. Such a principal carries no account ID, so it blocks the account
+exactly as a wildcard does, and blocking is what recording a violation says. The
+rule is stated once in
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
 
@@ -112,9 +112,12 @@ Summary fields beyond the common three: `total_keys_analyzed`,
 `unique_third_party_accounts`, `third_party_account_count`, `actions_by_account`.
 
 Entry shape: `key_id`, `key_arn`, `region`, `third_party_account_ids`,
-`actions_by_account`, `has_wildcard_principal`.
+`actions_by_account`, `has_wildcard_principal`, `has_non_account_principals`.
 
 `actions_by_account` is filtered to third-party accounts.
+
+`keys_with_wildcards` counts every violation, so a key blocked only by a
+principal carrying no account ID is counted there despite the name.
 
 ## Placement and generated policy
 
@@ -129,9 +132,12 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
    here that can cause a *deployed* policy to break existing access.
 2. Only the `default` key policy is read.
 3. `Condition`, `Resource`, and `NotAction` are not evaluated.
-4. A `Federated` principal aborts rather than blocking.
-5. `_normalize_actions` calls `list()` on a non-string `Action`, which raises
+4. `_normalize_actions` calls `list()` on a non-string `Action`, which raises
    `TypeError` on `None` and yields dict keys on a mapping.
+5. AWS documents federated principals only for role trust policies, so a
+   `Federated` principal in a key policy may grant nothing at all. It is still
+   counted as a blocker, because whether the grant is live is not readable from
+   the document and INV-01 forbids assuming it is not.
 
 ## Acceptance scenarios
 
@@ -143,6 +149,9 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 4. A key returning `NotFoundException` → recorded as granting nothing.
 5. A key whose only external access is a grant → reported compliant. This is
    limitation 1.
+6. A key policy with a `Federated` or `CanonicalUser` principal → violation; the
+   account is blocked for KMS, and the remaining keys are still read.
+7. A key policy naming a principal key AWS does not document → the run aborts.
 
 ## Referenced invariants
 
@@ -152,6 +161,7 @@ INV-01, INV-02, INV-04, INV-06, INV-13, INV-16.
 
 - `headroom/checks/rcps/deny_kms_third_party_access.py`
 - `headroom/aws/kms.py` — `analyze_kms_key_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_kms_third_party_access.py`,
-  `tests/test_aws_kms.py`
+  `tests/test_aws_kms.py`, `tests/test_aws_policy_documents.py`

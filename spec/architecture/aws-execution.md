@@ -155,7 +155,24 @@ Two deliberate exceptions, both narrow:
 | Tolerated | Why |
 |---|---|
 | Any `ClientError` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them. Wider than intended — see [`../contracts/configuration.md`](../contracts/configuration.md) |
-| Per-region and per-resource errors inside a check | Specified per check. Each such case is meant to be reported in that check's result rather than silently dropped, and one still is not: [`deny_sqs_third_party_access`](../checks/rcps/deny_sqs_third_party_access.md) drops a queue naming an unrecognized principal key, which is conflict 4b |
+| Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped. The last exception was [`deny_sqs_third_party_access`](../checks/rcps/deny_sqs_third_party_access.md), which dropped a queue naming an unrecognized principal key; that was conflict 4b and it is resolved |
+
+### What a policy document may and may not stop the run over
+
+The RCP analyzers read policy documents an account's own operators wrote, so
+they meet two different kinds of trouble and answer them differently. The rule
+is stated in full in
+[`../contracts/policy-model.md`](../contracts/policy-model.md); its consequence
+for this document is that only the first kind reaches INV-02:
+
+| Kind | Example | Answer |
+|---|---|---|
+| A document AWS could not have stored | Unparseable JSON, a `Statement` that is neither object nor list, a principal key outside the four AWS documents | **Aborts.** Headroom misread the document or does not model it, and continuing would mean guessing |
+| A document AWS accepted that no allowlist can express | `Principal: "*"`, an `Allow` with `NotPrincipal`, a `Federated` or `CanonicalUser` principal | **Blocks the account** for that check. Recorded as a violation; the scan continues |
+
+The second kind used to abort in four of the five resource-policy analyzers,
+which protected one account at the cost of every other account's results. That
+was conflict 4.
 
 `main` catches `ValueError`, `RuntimeError`, and `ClientError` around
 organization discovery, Terraform generation, and reconciliation, printing a

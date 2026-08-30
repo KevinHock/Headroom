@@ -7,9 +7,10 @@ Headroom reads an existing policy document.
 A per-check specification names the pattern it implements rather than restating
 what the pattern is.
 
-Implementation: `headroom/aws/policy_documents.py` (shared grammar),
-`headroom/constants.py` (principal types, ARN pattern), and every service
-adapter that reads a policy document — `aws/ecr.py`, `aws/kms.py`, `aws/s3.py`,
+Implementation: `headroom/aws/policy_documents.py` (shared grammar, including
+the principal types and the one function that reads a `Principal` element),
+`headroom/constants.py` (ARN pattern), and every service adapter that reads a
+policy document — `aws/ecr.py`, `aws/kms.py`, `aws/s3.py`,
 `aws/secretsmanager.py`, `aws/sqs.py`, `aws/iam/roles.py`. A change to how a
 statement is read is a change to all of them.
 
@@ -148,9 +149,10 @@ is not a safe guess (INV-01).
 | `Allow` with `NotPrincipal` | Wildcard — grants to everyone except a short list, the same reach |
 | `Deny` with `NotPrincipal` | Nothing — it restricts rather than grants, and a resource policy's Deny hands access to nobody |
 | An account ID or an ARN | The 12-digit account ID it names |
-| `Service` | Not an account principal |
-| `Federated` | Supplies no `aws:PrincipalAccount`, so no allowlist can preserve it; handled per check. A SAML provider ARN does contain twelve digits, but they name the provider's host account, not the caller's. |
-| `CanonicalUser` | An opaque S3 identifier that maps to no account ID the scan can read; handled per check |
+| `Service` | Not an account principal, and not a blocker |
+| `Federated` | Carries no account ID — a blocker. A SAML provider ARN does contain twelve digits, but they name the provider's host account, not the caller's. |
+| `CanonicalUser` | An opaque identifier that maps to an account only through an API call the scan does not make — a blocker |
+| Any other key | `UnknownPrincipalTypeError`, aborting the run |
 
 Callers must apply their own `Effect` gate **before** consulting `NotPrincipal`.
 A statement carrying both `Principal` and `NotPrincipal` is not valid IAM and
@@ -162,11 +164,56 @@ service segment is unconstrained, because a resource-policy principal can be an
 STS session ARN as readily as an IAM one, and the partition is matched the same
 way so GovCloud and China ARNs resolve.
 
-`Federated` and `CanonicalUser` principals name no account, so no allowlist can
-express them. They are **not** handled uniformly: the S3 analyzer records them
-as violations, while the ECR, KMS, Secrets Manager, and SQS analyzers raise, and
-the STS analyzer raises on a `CanonicalUser` or on a `Federated` principal
-granted `sts:AssumeRole`. Each check's document states its own behavior.
+### One reader, six analyzers
+
+`read_principal` in `headroom/aws/policy_documents.py` is the only place a
+`Principal` element is interpreted. It returns three facts and nothing else: the
+account IDs the element names, whether it reaches principals the analyzer cannot
+enumerate, and whether it names a principal type that carries no account ID.
+
+The permitted keys are a parameter, because the two policy types differ in one
+key and only one:
+
+| Set | Keys | Used by |
+|---|---|---|
+| `RESOURCE_POLICY_PRINCIPAL_TYPES` | `AWS`, `CanonicalUser`, `Federated`, `Service` | `aws/ecr.py`, `aws/kms.py`, `aws/s3.py`, `aws/secretsmanager.py`, `aws/sqs.py` |
+| `TRUST_POLICY_PRINCIPAL_TYPES` | `AWS`, `Federated`, `Service` | `aws/iam/roles.py` |
+
+A canonical user ID is an Amazon S3 identifier, so it cannot name who may assume
+a role and a trust policy does not accept the key. The resource-policy set is
+the **union** of what resource policies accept rather than a list per service:
+S3 is the service that documents `CanonicalUser`, and admitting the key
+everywhere costs a branch that never fires if AWS rejects it elsewhere, where
+excluding it would abort a whole organization's scan over one queue.
+
+### A blocker stops the account; a document Headroom cannot read stops the run
+
+Both a wildcard and a principal carrying no account ID mean the same thing: the
+RCP would deny a grant that exists today, because an allowlist keyed on
+`aws:PrincipalAccount` cannot carry it. That is **one verdict, recorded** — the
+resource becomes a violation, the account is blocked for that check, and the
+scan continues. Which of the two it was is reported and not acted on
+differently.
+
+An undocumented principal key is the separate case and **aborts**. AWS validates
+the `Principal` element when it stores a policy, so a key outside the documented
+four means Headroom misread the document or AWS has added a principal type
+nobody has modelled here. Recording it as a finding would state a verdict on a
+grant this code cannot read.
+
+The dividing line is the same one that governs unparseable JSON and a malformed
+`Statement`: **a document AWS could not have stored aborts the run; a document
+AWS accepted that no allowlist can express blocks the account.** Aborting
+protects the account at the cost of every other account's results and puts the
+finding in a stack trace instead of the report, so it is reserved for the case
+where continuing would mean guessing.
+
+[`deny_sts_third_party_assumerole`](../checks/rcps/deny_sts_third_party_assumerole.md)
+reads the same three facts and acts on two of them. Its RCP denies
+`sts:AssumeRole` alone, which a federated identity cannot call — AWS routes
+federation through `AssumeRoleWithSAML` and `AssumeRoleWithWebIdentity` — so a
+`Federated` principal in a trust policy is not a grant that RCP can break. It is
+the one place the third fact is read and deliberately ignored.
 
 ### Actions
 

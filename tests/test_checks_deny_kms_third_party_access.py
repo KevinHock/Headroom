@@ -12,6 +12,7 @@ from headroom.checks.rcps.deny_kms_third_party_access import DenyKMSThirdPartyAc
 from headroom.constants import DENY_KMS_THIRD_PARTY_ACCESS
 from headroom.config import DEFAULT_RESULTS_DIR
 from headroom.aws.kms import KMSKeyPolicyAnalysis
+from headroom.enums import CheckCategory
 
 
 class TestCheckDenyKMSThirdPartyAccess:
@@ -384,3 +385,75 @@ class TestCheckDenyKMSThirdPartyAccess:
             assert set(summary["unique_third_party_accounts"]) == {"888888888888", "999999999999"}
             assert "888888888888" in summary["actions_by_account"]
             assert "999999999999" in summary["actions_by_account"]
+
+    def test_a_non_account_principal_is_a_violation(
+        self,
+        temp_results_dir: str,
+        org_account_ids: set[str],
+    ) -> None:
+        """
+        A key naming a principal with no account ID blocks the account.
+
+        The allowlist is a list of account IDs. A principal that has none
+        cannot appear on it, so attaching the RCP would deny access the key
+        policy grants today - the same reasoning that makes a wildcard a
+        violation.
+        """
+        check = DenyKMSThirdPartyAccessCheck(
+            check_name=DENY_KMS_THIRD_PARTY_ACCESS,
+            account_name="test-account",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+            org_account_ids=org_account_ids,
+        )
+
+        category, result_dict = check.categorize_result(
+            KMSKeyPolicyAnalysis(
+                key_id="key-federated",
+                key_arn="arn:aws:kms:us-east-1:111111111111:key/key-federated",
+                region="us-east-1",
+                third_party_account_ids=set(),
+                actions_by_account={},
+                has_wildcard_principal=False,
+                has_non_account_principals=True,
+            )
+        )
+
+        assert category == CheckCategory.VIOLATION
+        assert result_dict["has_non_account_principals"] is True
+
+    def test_a_non_account_principal_alone_keeps_the_key(
+        self,
+        temp_results_dir: str,
+        org_account_ids: set[str],
+    ) -> None:
+        """
+        The check's own filter must not drop the finding before it is counted.
+
+        A key whose only finding is a principal with no account ID has no
+        third-party account IDs and no wildcard, so a filter reading only
+        those two would discard the very entry that blocks the account.
+        """
+        check = DenyKMSThirdPartyAccessCheck(
+            check_name=DENY_KMS_THIRD_PARTY_ACCESS,
+            account_name="test-account",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+            org_account_ids=org_account_ids,
+        )
+
+        analysis = KMSKeyPolicyAnalysis(
+            key_id="key-federated",
+            key_arn="arn:aws:kms:us-east-1:111111111111:key/key-federated",
+            region="us-east-1",
+            third_party_account_ids=set(),
+            actions_by_account={},
+            has_wildcard_principal=False,
+            has_non_account_principals=True,
+        )
+
+        with patch(
+            "headroom.checks.rcps.deny_kms_third_party_access.analyze_kms_key_policies",
+            return_value=[analysis],
+        ):
+            assert check.analyze(MagicMock()) == [analysis]

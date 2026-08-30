@@ -6,11 +6,6 @@ This module contains check name constants used throughout the Headroom codebase.
 
 from typing import Dict
 
-# AWS IAM Policy Principal Types
-# Base types supported in both IAM trust policies and S3 bucket policies
-# Reference: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html
-BASE_PRINCIPAL_TYPES = frozenset({"AWS", "Service", "Federated"})
-
 # AWS ARN Regex Pattern
 # Pattern to extract 12-digit account ID from AWS ARN
 # Format: arn:partition:service:region:account-id:resource

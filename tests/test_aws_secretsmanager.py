@@ -8,124 +8,15 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
-from headroom.aws.policy_documents import MalformedPolicyError
-from headroom.aws.secretsmanager import (
-    UnsupportedPrincipalTypeError,
+from headroom.aws.policy_documents import (
+    MalformedPolicyError,
     UnknownPrincipalTypeError,
+)
+from headroom.aws.secretsmanager import (
     _analyze_secret_policy,
-    _extract_account_ids_from_principal,
-    _has_non_account_principals,
-    _has_wildcard_principal,
     analyze_secrets_manager_policies,
 )
 from headroom.types import JsonDict
-
-
-class TestExtractAccountIdsFromPrincipal:
-    """Test account ID extraction from principals."""
-
-    def test_extract_from_arn_format(self) -> None:
-        """Test extraction from ARN format principal."""
-        principal = "arn:aws:iam::666666666666:root"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"666666666666"}
-
-    def test_extract_from_plain_account_id(self) -> None:
-        """Test extraction from plain account ID."""
-        principal = "666666666666"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"666666666666"}
-
-    def test_extract_from_list(self) -> None:
-        """Test extraction from list of principals."""
-        principal = [
-            "arn:aws:iam::111111111111:root",
-            "222222222222"
-        ]
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"111111111111", "222222222222"}
-
-    def test_extract_from_dict_aws_key(self) -> None:
-        """Test extraction from dict with AWS key."""
-        principal = {
-            "AWS": "arn:aws:iam::333333333333:root"
-        }
-        result = _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-        assert result == {"333333333333"}
-
-    def test_extract_from_dict_aws_list(self) -> None:
-        """Test extraction from dict with AWS key as list."""
-        principal = {
-            "AWS": [
-                "arn:aws:iam::444444444444:root",
-                "555555555555"
-            ]
-        }
-        result = _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-        assert result == {"444444444444", "555555555555"}
-
-    def test_wildcard_returns_empty(self) -> None:
-        """Test that wildcard principal returns empty set."""
-        principal = "*"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == set()
-
-    def test_unknown_principal_type_raises(self) -> None:
-        """Test that unknown principal type raises exception."""
-        principal = {"UnknownType": "value"}
-        with pytest.raises(UnknownPrincipalTypeError):
-            _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-
-
-class TestHasWildcardPrincipal:
-    """Test wildcard principal detection."""
-
-    def test_string_wildcard(self) -> None:
-        """Test detection of string wildcard."""
-        assert _has_wildcard_principal("*") is True
-
-    def test_string_non_wildcard(self) -> None:
-        """Test non-wildcard string."""
-        assert _has_wildcard_principal("arn:aws:iam::666666666666:root") is False
-
-    def test_list_with_wildcard(self) -> None:
-        """Test list containing wildcard."""
-        assert _has_wildcard_principal(["arn:aws:iam::666666666666:root", "*"]) is True
-
-    def test_list_without_wildcard(self) -> None:
-        """Test list without wildcard."""
-        assert _has_wildcard_principal(["arn:aws:iam::666666666666:root"]) is False
-
-    def test_dict_aws_wildcard(self) -> None:
-        """Test dict with AWS wildcard."""
-        assert _has_wildcard_principal({"AWS": "*"}) is True
-
-    def test_dict_aws_list_wildcard(self) -> None:
-        """Test dict with AWS list containing wildcard."""
-        assert _has_wildcard_principal({"AWS": ["arn:aws:iam::666666666666:root", "*"]}) is True
-
-
-class TestHasNonAccountPrincipals:
-    """Test non-account principal detection."""
-
-    def test_federated_principal(self) -> None:
-        """Test detection of Federated principal."""
-        principal = {"Federated": "arn:aws:iam::666666666666:saml-provider/ExampleProvider"}
-        assert _has_non_account_principals(principal) is True  # type: ignore[arg-type]
-
-    def test_canonical_user_principal(self) -> None:
-        """Test detection of CanonicalUser principal."""
-        principal = {"CanonicalUser": "example-canonical-user-id"}
-        assert _has_non_account_principals(principal) is True  # type: ignore[arg-type]
-
-    def test_aws_principal_only(self) -> None:
-        """Test AWS principal without non-account types."""
-        principal = {"AWS": "arn:aws:iam::666666666666:root"}
-        assert _has_non_account_principals(principal) is False  # type: ignore[arg-type]
-
-    def test_non_dict_principal(self) -> None:
-        """Test non-dict principal."""
-        assert _has_non_account_principals("*") is False
 
 
 class TestAnalyzeSecretPolicy:
@@ -235,8 +126,14 @@ class TestAnalyzeSecretPolicy:
 
         assert result is None
 
-    def test_federated_principal_raises(self) -> None:
-        """Test that Federated principal raises exception."""
+    def test_a_federated_principal_blocks_the_secret_rather_than_the_run(self) -> None:
+        """
+        A Federated principal is recorded as a finding, not raised.
+
+        The secret's grant cannot be expressed in an allowlist of account
+        IDs, so the account must not take this RCP. Recording says so and
+        leaves the remaining secrets readable.
+        """
         policy = {
             "Statement": [
                 {
@@ -246,14 +143,64 @@ class TestAnalyzeSecretPolicy:
                 }
             ]
         }
-        org_account_ids = {"111111111111"}
 
-        with pytest.raises(UnsupportedPrincipalTypeError):
+        result = _analyze_secret_policy(
+            "federated-secret",
+            "arn:aws:secretsmanager:us-east-1:111111111111:secret:federated-secret",
+            policy,  # type: ignore[arg-type]
+            {"111111111111"}
+        )
+
+        assert result is not None
+        assert result.has_non_account_principals is True
+        assert result.third_party_account_ids == set()
+
+    def test_a_canonical_user_blocks_the_secret(self) -> None:
+        """A canonical user ID maps to no account the allowlist can carry."""
+        policy = {
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"CanonicalUser": "d" * 64},
+                    "Action": "secretsmanager:GetSecretValue"
+                }
+            ]
+        }
+
+        result = _analyze_secret_policy(
+            "canonical-secret",
+            "arn:aws:secretsmanager:us-east-1:111111111111:secret:canonical-secret",
+            policy,  # type: ignore[arg-type]
+            {"111111111111"}
+        )
+
+        assert result is not None
+        assert result.has_non_account_principals is True
+
+    def test_a_principal_key_aws_does_not_document_aborts(self) -> None:
+        """
+        An undocumented principal key still stops the run.
+
+        AWS validates the Principal element when PutResourcePolicy stores the
+        document, so a key outside the documented four means the policy was
+        misread or names a principal type nobody has modelled here.
+        """
+        policy = {
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Kerberos": "example"},
+                    "Action": "secretsmanager:GetSecretValue"
+                }
+            ]
+        }
+
+        with pytest.raises(UnknownPrincipalTypeError):
             _analyze_secret_policy(
-                "federated-secret",
-                "arn:aws:secretsmanager:us-east-1:111111111111:secret:federated-secret",
+                "odd-secret",
+                "arn:aws:secretsmanager:us-east-1:111111111111:secret:odd-secret",
                 policy,  # type: ignore[arg-type]
-                org_account_ids
+                {"111111111111"}
             )
 
     def test_org_account_only_returns_none(self) -> None:

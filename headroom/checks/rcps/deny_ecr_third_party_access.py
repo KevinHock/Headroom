@@ -24,6 +24,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRRepositoryPolicyAnalysis]):
     This check identifies:
     - ECR repositories with policies allowing accounts outside the organization
     - ECR repositories with wildcard principals in policies
+    - ECR repositories granting to a principal type carrying no account ID
     - All unique third-party account IDs found
     - ECR actions allowed per third-party account
     """
@@ -66,8 +67,9 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRRepositoryPolicyAnalysis]):
         """
         Analyze ECR repository policies for third-party access.
 
-        Filters to only return repositories with wildcards or third-party access.
-        Repositories with neither are not relevant to this check.
+        Filters to repositories with third-party access, a wildcard, or a
+        principal carrying no account ID. Repositories with none of the three
+        are not relevant to this check.
 
         Args:
             session: boto3.Session for the target account
@@ -78,7 +80,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRRepositoryPolicyAnalysis]):
         all_results = analyze_ecr_repository_policies(session, self.org_account_ids)
         return [
             result for result in all_results
-            if result.has_wildcard_principal or result.third_party_account_ids
+            if result.has_wildcard_principal or result.has_non_account_principals or result.third_party_account_ids
         ]
 
     def categorize_result(
@@ -104,6 +106,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRRepositoryPolicyAnalysis]):
                 for account_id, actions in result.actions_by_account.items()
             },
             "has_wildcard_principal": result.has_wildcard_principal,
+            "has_non_account_principals": result.has_non_account_principals,
         }
 
         self.all_third_party_accounts.update(result.third_party_account_ids)
@@ -113,7 +116,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRRepositoryPolicyAnalysis]):
                 self.all_actions_by_account[account_id] = set()
             self.all_actions_by_account[account_id].update(actions)
 
-        if result.has_wildcard_principal:
+        if result.has_wildcard_principal or result.has_non_account_principals:
             return (CheckCategory.VIOLATION, result_dict)
         return (CheckCategory.COMPLIANT, result_dict)
 

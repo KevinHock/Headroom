@@ -5,6 +5,7 @@ status: implemented
 applies_to:
   - headroom/checks/rcps/deny_sqs_third_party_access.py
   - headroom/aws/sqs.py
+  - headroom/aws/policy_documents.py
 depends_on:
   - INV-01
   - INV-02
@@ -15,6 +16,7 @@ depends_on:
 verification:
   - tests/test_checks_deny_sqs_third_party_access.py
   - tests/test_aws_sqs.py
+  - tests/test_aws_policy_documents.py
 ---
 
 # deny_sqs_third_party_access
@@ -52,18 +54,20 @@ Per enabled region: `sqs:ListQueues` (paginated), then `sqs:GetQueueAttributes`
 requesting `Policy` and `QueueArn` per queue.
 
 For each `Allow` statement: `NotPrincipal` presence, `Principal`, `Action`.
-Permitted principal types are `AWS`, `Service`, and `Federated`.
+The `Principal` element is read by `read_principal` against
+`RESOURCE_POLICY_PRINCIPAL_TYPES`
+([`../../contracts/policy-model.md`](../../contracts/policy-model.md)).
 
 ## Decision table
 
 | State | Condition | Category |
 |---|---|---|
 | Violation | A wildcard principal — literal `*`, or an `Allow` with `NotPrincipal` | `VIOLATION` |
+| Violation | A `Federated` or `CanonicalUser` principal | `VIOLATION` |
 | Compliant | Third-party account IDs only | `COMPLIANT` |
 | Exemption | — | Never produced |
 | Not recorded | The queue has no policy | Not in the output |
-| Aborts | A `Federated` principal, or unparseable policy JSON | The run aborts |
-| Silently dropped | An unrecognized principal key | Logged at warning and skipped |
+| Aborts | Unparseable policy JSON, or a principal key AWS does not document | The run aborts |
 
 ## Failure behavior
 
@@ -73,41 +77,17 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | No `Policy` attribute | Skipped; the queue grants nothing |
 | Any other `ClientError` in any region | Logged and re-raised, aborting the run |
 | `Statement` neither object nor list | `MalformedPolicyError`, aborting the run |
-| A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
 | Unparseable policy JSON | `json.JSONDecodeError`, aborting the run |
-| An unrecognized principal key | `UnknownPrincipalTypeError`, **logged at warning; the queue is skipped** |
+| A principal key outside the four documented types | `UnknownPrincipalTypeError`, aborting the run |
 
-## Known conflict: an unrecognized principal key is skipped
-
-The last row of the table above is a divergence from every other analyzer, and
-it runs against INV-01: a queue whose principal could not be read is dropped
-rather than blocking the account, so the account can be cleared for the RCP on
-the strength of a queue nobody managed to evaluate.
-
-A `CanonicalUser` principal is the case that reaches it. This is the only
-analyzer that catches `UnknownPrincipalTypeError`, so a principal no allowlist
-can express is counted as no finding at all. ECR and KMS let that same exception
-abort, Secrets Manager aborts on `UnsupportedPrincipalTypeError` instead, and
-[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records the
-principal as a violation. Four analyzers, four answers to one question.
-
-Unparseable policy JSON used to reach the same clause and was conflict 3. It now
-aborts, matching every other resource-policy analyzer: `GetQueueAttributes`
-returning a document `json` cannot read is not an ordinary fact about the
-account, because `SetQueueAttributes` validates what it stores.
-
-**Status: unresolved.** Recorded rather than fixed, because raising here changes
-which accounts are cleared. Conflict 4b in [`../index.md`](../index.md).
-
-## Known conflict: aborting on a `Federated` principal
-
-A `Federated` principal raises `UnsupportedPrincipalTypeError` and stops the run,
-the same divergence as
-[`deny_ecr_third_party_access`](deny_ecr_third_party_access.md). This check
-therefore aborts on one principal type no allowlist can express and silently
-skips another.
-
-**Status: unresolved.** Conflict 4 in [`../index.md`](../index.md).
+**This analyzer catches nothing a policy document can raise.** It once caught
+`UnknownPrincipalTypeError` and skipped the queue, which cleared the account on
+the strength of a queue nobody had read — conflict 4b, against INV-01 — and it
+once raised on a `Federated` principal and stopped the whole run, which was
+conflict 4. Both are resolved: a principal no allowlist can carry is now a
+violation like any other blocker, and a principal key AWS does not document
+aborts here exactly as it does everywhere else. The rule is stated once in
+[`../../contracts/policy-model.md`](../../contracts/policy-model.md).
 
 ## Result contract
 
@@ -154,14 +134,15 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. A queue naming an unrecognized principal key is dropped rather than
-   blocking; see Failure behavior.
-2. `actions_by_third_party_account` includes in-organization accounts.
-3. A `Federated` principal aborts rather than blocking.
-4. `Condition`, `Resource`, and `NotAction` are not evaluated.
-5. The queue-level filter for third-party or wildcard findings lives in the
+1. `actions_by_third_party_account` includes in-organization accounts.
+2. `Condition`, `Resource`, and `NotAction` are not evaluated.
+3. The queue-level filter for third-party or wildcard findings lives in the
    check's `analyze`, not in the analyzer, which appends every queue that has a
    policy.
+4. AWS documents federated principals only for role trust policies, so a
+   `Federated` principal in a queue policy may grant nothing at all. It is still
+   counted as a blocker, because whether the grant is live is not readable from
+   the document and INV-01 forbids assuming it is not.
 
 ## Acceptance scenarios
 
@@ -175,8 +156,10 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 5. A queue deleted between listing and reading → skipped.
 6. `AccessDenied` in one region → the run aborts.
 7. A queue whose policy is not valid JSON → the run aborts.
-8. A queue naming a `CanonicalUser` principal → logged and skipped; the account
-   can still be cleared. This is limitation 1.
+8. A queue naming a `CanonicalUser` principal → violation; the account is
+   blocked for SQS, and the remaining queues are still read.
+9. A queue naming a `Federated` principal → violation, on the same grounds.
+10. A queue naming a principal key AWS does not document → the run aborts.
 
 ## Referenced invariants
 
@@ -186,6 +169,7 @@ INV-01 (see Failure behavior), INV-02, INV-04, INV-06, INV-13, INV-16.
 
 - `headroom/checks/rcps/deny_sqs_third_party_access.py`
 - `headroom/aws/sqs.py` — `analyze_sqs_queue_policies`
+- `headroom/aws/policy_documents.py` — `read_principal`
 - `test_environment/modules/rcps/locals.tf`
 - Tests: `tests/test_checks_deny_sqs_third_party_access.py`,
-  `tests/test_aws_sqs.py`
+  `tests/test_aws_sqs.py`, `tests/test_aws_policy_documents.py`

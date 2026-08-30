@@ -11,117 +11,12 @@ from botocore.exceptions import ClientError
 
 from headroom.aws.sqs import (
     analyze_sqs_queue_policies,
-    _extract_account_ids_from_principal,
-    _check_for_wildcard_principal,
-    _check_for_non_account_principals,
     _normalize_actions,
-    UnknownPrincipalTypeError,
-    UnsupportedPrincipalTypeError,
 )
-from headroom.aws.policy_documents import MalformedPolicyError
-
-
-class TestExtractAccountIdsFromPrincipal:
-    """Test _extract_account_ids_from_principal function."""
-
-    def test_extract_from_arn(self) -> None:
-        """Test extracting account ID from ARN format."""
-        principal = "arn:aws:iam::111111111111:root"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"111111111111"}
-
-    def test_extract_from_plain_account_id(self) -> None:
-        """Test extracting plain 12-digit account ID."""
-        principal = "222222222222"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"222222222222"}
-
-    def test_extract_from_list(self) -> None:
-        """Test extracting from list of principals."""
-        principal = [
-            "arn:aws:iam::111111111111:root",
-            "222222222222",
-        ]
-        result = _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-        assert result == {"111111111111", "222222222222"}
-
-    def test_extract_from_dict_aws_key(self) -> None:
-        """Test extracting from dict with AWS key."""
-        principal = {
-            "AWS": [
-                "arn:aws:iam::333333333333:root",
-                "444444444444"
-            ]
-        }
-        result = _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-        assert result == {"333333333333", "444444444444"}
-
-    def test_wildcard_returns_empty_set(self) -> None:
-        """Test that wildcard principal returns empty set."""
-        principal = "*"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == set()
-
-    def test_unknown_principal_type_raises_error(self) -> None:
-        """Test that unknown principal type raises error."""
-        principal = {"UnknownType": "value"}
-        with pytest.raises(UnknownPrincipalTypeError):
-            _extract_account_ids_from_principal(principal)  # type: ignore[arg-type]
-
-
-class TestCheckForWildcardPrincipal:
-    """Test _check_for_wildcard_principal function."""
-
-    def test_string_wildcard(self) -> None:
-        """Test detecting wildcard in string."""
-        assert _check_for_wildcard_principal("*") is True
-
-    def test_string_not_wildcard(self) -> None:
-        """Test non-wildcard string."""
-        assert _check_for_wildcard_principal("arn:aws:iam::111111111111:root") is False
-
-    def test_list_with_wildcard(self) -> None:
-        """Test detecting wildcard in list."""
-        assert _check_for_wildcard_principal(["*", "arn:aws:iam::111111111111:root"]) is True
-
-    def test_list_without_wildcard(self) -> None:
-        """Test list without wildcard."""
-        assert _check_for_wildcard_principal(["arn:aws:iam::111111111111:root"]) is False
-
-    def test_dict_with_wildcard(self) -> None:
-        """Test detecting wildcard in dict."""
-        assert _check_for_wildcard_principal({"AWS": "*"}) is True
-
-    def test_dict_without_wildcard(self) -> None:
-        """Test dict without wildcard."""
-        assert _check_for_wildcard_principal({"AWS": "arn:aws:iam::111111111111:root"}) is False
-
-
-class TestCheckForNonAccountPrincipals:
-    """Test _check_for_non_account_principals function."""
-
-    def test_detects_federated_principal(self) -> None:
-        """Test detecting Federated principal."""
-        principal = {"Federated": "arn:aws:iam::111111111111:saml-provider/MyProvider"}
-        assert _check_for_non_account_principals(principal) is True  # type: ignore[arg-type]
-
-    def test_ignores_aws_principal(self) -> None:
-        """Test that AWS principal is not flagged."""
-        principal = {"AWS": "arn:aws:iam::111111111111:root"}
-        assert _check_for_non_account_principals(principal) is False  # type: ignore[arg-type]
-
-    def test_ignores_service_principal(self) -> None:
-        """Test that Service principal is not flagged."""
-        principal = {"Service": "sqs.amazonaws.com"}
-        assert _check_for_non_account_principals(principal) is False  # type: ignore[arg-type]
-
-    def test_mixed_with_federated(self) -> None:
-        """Test mixed principals with Federated."""
-        principal = {
-            "AWS": "arn:aws:iam::111111111111:root",
-            "Federated": "arn:aws:iam::111111111111:saml-provider/MyProvider"
-        }
-        assert _check_for_non_account_principals(principal) is True  # type: ignore[arg-type]
+from headroom.aws.policy_documents import (
+    MalformedPolicyError,
+    UnknownPrincipalTypeError,
+)
 
 
 class TestNormalizeActions:
@@ -241,55 +136,6 @@ class TestAnalyzeSQSQueuePolicies:
 
         assert len(results) == 1
         assert results[0].has_wildcard_principal is True
-
-    def test_queue_with_federated_principal_raises_error(self) -> None:
-        """Test queue with Federated principal raises UnsupportedPrincipalTypeError."""
-        mock_session = MagicMock()
-        mock_ec2_client = MagicMock()
-        mock_sqs_client = MagicMock()
-
-        mock_session.client.side_effect = lambda service, **kwargs: {
-            "ec2": mock_ec2_client,
-            "sqs": mock_sqs_client,
-        }.get(service)
-
-        mock_ec2_client.describe_regions.return_value = {
-            "Regions": [{"RegionName": "us-east-1"}]
-        }
-
-        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/federated-queue"
-        queue_arn = "arn:aws:sqs:us-east-1:111111111111:federated-queue"
-
-        paginator = MagicMock()
-        paginator.paginate.return_value = [
-            {"QueueUrls": [queue_url]}
-        ]
-        mock_sqs_client.get_paginator.return_value = paginator
-
-        policy = {
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {"Federated": "arn:aws:iam::111111111111:saml-provider/MyProvider"},
-                "Action": "sqs:SendMessage",
-                "Resource": queue_arn
-            }]
-        }
-
-        mock_sqs_client.get_queue_attributes.return_value = {
-            "Attributes": {
-                "Policy": json.dumps(policy),
-                "QueueArn": queue_arn
-            }
-        }
-
-        org_account_ids = {"111111111111"}
-
-        with pytest.raises(UnsupportedPrincipalTypeError) as exc_info:
-            analyze_sqs_queue_policies(mock_session, org_account_ids)
-
-        assert "Federated principal" in str(exc_info.value)
-        assert queue_arn in str(exc_info.value)
 
     def test_queue_without_policy_skipped(self) -> None:
         """Test queues without policies are skipped."""
@@ -880,15 +726,57 @@ class TestAnalyzeSQSQueuePolicies:
         with pytest.raises(json.JSONDecodeError):
             analyze_sqs_queue_policies(mock_session, {"111111111111"})
 
-    def test_unrecognized_principal_key_drops_the_queue(self) -> None:
+    def test_a_federated_principal_blocks_the_queue_rather_than_the_run(self) -> None:
         """
-        A `CanonicalUser` principal is logged and skipped, clearing the account.
+        A Federated principal is a finding, not a reason to stop scanning.
 
-        This is conflict 4b, still unresolved, and it had no test of its own
-        until the unparseable-JSON case stopped sharing the clause with it. The
-        queue vanishes from the results, so an account whose only third-party
-        grant sits here reports no findings and the RCP attaches over it.
-        Pinned so that resolving 4b has to change a test that says what it costs.
+        It carries no account ID, so the RCP's allowlist cannot preserve its
+        access - which is the same verdict `Principal: "*"` earns, and the
+        blocking verdict is delivered by recording it. Aborting delivered the
+        same protection for this account at the cost of every other account's
+        results, and put the finding in a stack trace instead of the report.
+        """
+        mock_session, mock_sqs_client = self._single_region_session()
+
+        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/federated-queue"
+        queue_arn = "arn:aws:sqs:us-east-1:111111111111:federated-queue"
+
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{"QueueUrls": [queue_url]}]
+        mock_sqs_client.get_paginator.return_value = paginator
+
+        mock_sqs_client.get_queue_attributes.return_value = {
+            "Attributes": {
+                "Policy": json.dumps({
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::111111111111:saml-provider/Example"
+                        },
+                        "Action": "sqs:SendMessage",
+                        "Resource": queue_arn,
+                    }],
+                }),
+                "QueueArn": queue_arn,
+            }
+        }
+
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+
+        assert len(results) == 1
+        assert results[0].has_non_account_principals is True
+        assert results[0].third_party_account_ids == set()
+
+    def test_a_canonical_user_blocks_the_queue_rather_than_vanishing(self) -> None:
+        """
+        A CanonicalUser principal is recorded, where it used to be skipped.
+
+        Skipping dropped the queue from the results, so an account whose only
+        third-party grant sat here reported no findings and took the RCP
+        anyway - absence of evidence read as evidence of safety (INV-01). A
+        canonical user ID maps to an account only through an API call the scan
+        does not make, so no allowlist can carry it and the account is blocked.
         """
         mock_session, mock_sqs_client = self._single_region_session()
 
@@ -914,7 +802,98 @@ class TestAnalyzeSQSQueuePolicies:
             }
         }
 
-        assert analyze_sqs_queue_policies(mock_session, {"111111111111"}) == []
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+
+        assert len(results) == 1
+        assert results[0].has_non_account_principals is True
+
+    def test_a_queue_after_a_federated_one_is_still_read(self) -> None:
+        """
+        The scan reaches every queue, which is what not aborting buys.
+
+        One queue's unallowlistable principal used to end the run, so a
+        third-party grant in any queue listed after it never entered the
+        allowlist and the generated RCP denied that partner on deploy.
+        """
+        mock_session, mock_sqs_client = self._single_region_session()
+
+        federated_url = "https://sqs.us-east-1.amazonaws.com/111111111111/federated-queue"
+        ordinary_url = "https://sqs.us-east-1.amazonaws.com/111111111111/partner-queue"
+
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {"QueueUrls": [federated_url, ordinary_url]}
+        ]
+        mock_sqs_client.get_paginator.return_value = paginator
+
+        policies = {
+            federated_url: {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Federated": "arn:aws:iam::111111111111:saml-provider/Example"
+                    },
+                    "Action": "sqs:SendMessage",
+                }],
+            },
+            ordinary_url: {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": {"AWS": "999999999999"},
+                    "Action": "sqs:SendMessage",
+                }],
+            },
+        }
+        mock_sqs_client.get_queue_attributes.side_effect = lambda **kwargs: {
+            "Attributes": {
+                "Policy": json.dumps(policies[kwargs["QueueUrl"]]),
+                "QueueArn": kwargs["QueueUrl"],
+            }
+        }
+
+        results = analyze_sqs_queue_policies(mock_session, {"111111111111"})
+
+        assert len(results) == 2
+        assert results[1].third_party_account_ids == {"999999999999"}
+
+    def test_a_principal_key_aws_does_not_document_aborts(self) -> None:
+        """
+        An undocumented principal key still stops the run.
+
+        AWS validates the Principal element when SetQueueAttributes stores the
+        policy, so a key outside the documented four means Headroom misread the
+        attribute or AWS has added a principal type nobody has modelled here.
+        Recording it as a finding would state a verdict on a grant this code
+        cannot read.
+        """
+        mock_session, mock_sqs_client = self._single_region_session()
+
+        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/test-queue"
+        queue_arn = "arn:aws:sqs:us-east-1:111111111111:test-queue"
+
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{"QueueUrls": [queue_url]}]
+        mock_sqs_client.get_paginator.return_value = paginator
+
+        mock_sqs_client.get_queue_attributes.return_value = {
+            "Attributes": {
+                "Policy": json.dumps({
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {"Kerberos": "example"},
+                        "Action": "sqs:SendMessage",
+                        "Resource": queue_arn,
+                    }],
+                }),
+                "QueueArn": queue_arn,
+            }
+        }
+
+        with pytest.raises(UnknownPrincipalTypeError):
+            analyze_sqs_queue_policies(mock_session, {"111111111111"})
 
 
 class TestPolicyGrammar:

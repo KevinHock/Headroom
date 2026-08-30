@@ -17,110 +17,13 @@ from headroom.aws.iam import (
     InvalidFederatedPrincipalError,
     MalformedStatementError,
     SamlProviderAnalysis,
-    UnknownPrincipalTypeError,
     analyze_iam_roles_trust_policies,
     get_saml_providers_analysis,
 )
-from headroom.aws.iam.roles import (
-    _extract_account_ids_from_principal,
-    _has_wildcard_principal,
+from headroom.aws.policy_documents import (
+    MalformedPolicyError,
+    UnknownPrincipalTypeError,
 )
-from headroom.aws.policy_documents import MalformedPolicyError
-
-
-class TestExtractAccountIdsFromPrincipal:
-    """Test _extract_account_ids_from_principal function."""
-
-    def test_extract_from_arn_string(self) -> None:
-        """Test extracting account ID from ARN string."""
-        principal = "arn:aws:iam::333333333333:root"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"333333333333"}
-
-    def test_extract_from_account_id_string(self) -> None:
-        """Test extracting from plain account ID string."""
-        principal = "333333333333"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"333333333333"}
-
-    def test_extract_from_wildcard(self) -> None:
-        """Test wildcard returns empty set."""
-        principal = "*"
-        result = _extract_account_ids_from_principal(principal)
-        assert result == set()
-
-    def test_extract_from_list(self) -> None:
-        """Test extracting from list of principals."""
-        principal = [
-            "arn:aws:iam::111111111111:root",
-            "arn:aws:iam::222222222222:root"
-        ]
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"111111111111", "222222222222"}
-
-    def test_extract_from_dict_aws_key(self) -> None:
-        """Test extracting from dict with AWS key."""
-        principal = {"AWS": "arn:aws:iam::333333333333:root"}
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"333333333333"}
-
-    def test_extract_from_dict_aws_list(self) -> None:
-        """Test extracting from dict with AWS key containing list."""
-        principal = {
-            "AWS": [
-                "arn:aws:iam::111111111111:root",
-                "arn:aws:iam::222222222222:root"
-            ]
-        }
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"111111111111", "222222222222"}
-
-    def test_ignore_service_principal(self) -> None:
-        """Test that service principals are ignored."""
-        principal = {"Service": "ec2.amazonaws.com"}
-        result = _extract_account_ids_from_principal(principal)
-        assert result == set()
-
-    def test_mixed_principals(self) -> None:
-        """Test mixed principal types."""
-        principal = {
-            "AWS": ["arn:aws:iam::111111111111:root"],
-            "Service": "lambda.amazonaws.com"
-        }
-        result = _extract_account_ids_from_principal(principal)
-        assert result == {"111111111111"}
-
-
-class TestHasWildcardPrincipal:
-    """Test _has_wildcard_principal function."""
-
-    def test_wildcard_string(self) -> None:
-        """Test wildcard in string."""
-        assert _has_wildcard_principal("*") is True
-
-    def test_no_wildcard_string(self) -> None:
-        """Test no wildcard in string."""
-        assert _has_wildcard_principal("arn:aws:iam::333333333333:root") is False
-
-    def test_wildcard_in_list(self) -> None:
-        """Test wildcard in list."""
-        assert _has_wildcard_principal(["arn:aws:iam::333333333333:root", "*"]) is True
-
-    def test_no_wildcard_in_list(self) -> None:
-        """Test no wildcard in list."""
-        assert _has_wildcard_principal(["arn:aws:iam::111111111111:root", "arn:aws:iam::222222222222:root"]) is False
-
-    def test_wildcard_in_dict_aws(self) -> None:
-        """Test wildcard in dict AWS key."""
-        assert _has_wildcard_principal({"AWS": "*"}) is True
-
-    def test_wildcard_in_dict_aws_list(self) -> None:
-        """Test wildcard in dict AWS key list."""
-        assert _has_wildcard_principal({"AWS": ["arn:aws:iam::333333333333:root", "*"]}) is True
-
-    def test_no_wildcard_in_dict(self) -> None:
-        """Test no wildcard in dict."""
-        assert _has_wildcard_principal({"AWS": "arn:aws:iam::333333333333:root"}) is False
 
 
 class TestAnalyzeIamRolesTrustPolicies:
@@ -858,37 +761,6 @@ class TestTrustPolicyActionMatching:
         }
         with pytest.raises(UnknownPrincipalTypeError):
             self.third_parties(statement)
-
-
-class TestPrincipalArnCoverage:
-    """
-    Tests that principal ARNs outside arn:aws:iam:: yield their account ID.
-
-    The trust policy analyzer matched only `^arn:aws:iam::(\\d{12}):`, so STS
-    session principals - which AWS documents as valid in a resource-based
-    policy, and a role trust policy is one - and every non-commercial
-    partition produced no account ID at all.
-    """
-
-    PARTNER = "999999999999"
-
-    @pytest.mark.parametrize("principal", [
-        "arn:aws:iam::999999999999:root",
-        "arn:aws:iam::999999999999:role/vendor",
-        "arn:aws:iam::999999999999:user/vendor",
-        "arn:aws:sts::999999999999:assumed-role/vendor/session",
-        "arn:aws:sts::999999999999:federated-user/vendor",
-        "arn:aws-us-gov:iam::999999999999:role/vendor",
-        "arn:aws-cn:iam::999999999999:role/vendor",
-        "999999999999",
-    ])
-    def test_principal_yields_account_id(self, principal: str) -> None:
-        """Each documented principal form resolves to its account."""
-        assert _extract_account_ids_from_principal(principal) == {self.PARTNER}
-
-    def test_non_account_principal_yields_nothing(self) -> None:
-        """A service principal carries no account ID."""
-        assert _extract_account_ids_from_principal("ec2.amazonaws.com") == set()
 
 
 class TestTrustPolicyGrammar:
