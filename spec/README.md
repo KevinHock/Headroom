@@ -59,7 +59,7 @@ the two is wrong; fix it at the owner and link from the other.
 | [`product.md`](product.md) | Purpose, users, the safety promise, non-goals |
 | [`invariants.md`](invariants.md) | Global invariants, each with an ID |
 | [`architecture/overview.md`](architecture/overview.md) | Pipeline stages, module responsibility, data flow |
-| [`architecture/aws-execution.md`](architecture/aws-execution.md) | Role chain, sessions, regions, account projections, failure policy |
+| [`architecture/aws-execution.md`](architecture/aws-execution.md) | Role chain, sessions, regions, partitions, account projections, and the general failure policy. A per-stage specific belongs to the stage's owner; this document links to it rather than restating it |
 | [`architecture/check-framework.md`](architecture/check-framework.md) | Registry, `BaseCheck` template, result categories |
 | [`contracts/configuration.md`](contracts/configuration.md) | Config fields, CLI options, precedence, defaults |
 | [`contracts/results.md`](contracts/results.md) | Result JSON schema, filenames, redaction, resume |

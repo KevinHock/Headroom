@@ -50,12 +50,23 @@ rest only as this table directs. Specification paths are shown relative to
 | `headroom/placement/` | [`contracts/placement.md`](spec/contracts/placement.md) | - |
 | `headroom/terraform/` | [`contracts/terraform.md`](spec/contracts/terraform.md), [`contracts/placement.md`](spec/contracts/placement.md) | `reconcile.py`, and `ensure_org_info_symlink` in `headroom/main.py`. `tests/test_terraform_reconcile.py`. |
 | `headroom/config.py`, `headroom/usage.py`, `sample_config.yaml` | [`contracts/configuration.md`](spec/contracts/configuration.md) | `README.md` and [`documentation/SETUP.md`](documentation/SETUP.md). `tests/test_config.py`, `tests/test_main.py`. |
-| `headroom/main.py` | [`architecture/overview.md`](spec/architecture/overview.md) for the stage order, [`contracts/terraform.md`](spec/contracts/terraform.md) for `ensure_org_info_symlink` | - |
+| `headroom/main.py` | [`architecture/overview.md`](spec/architecture/overview.md) for the stage order, [`architecture/aws-execution.md`](spec/architecture/aws-execution.md) for the top-level `try`, [`contracts/terraform.md`](spec/contracts/terraform.md) for `ensure_org_info_symlink` | - |
 | `headroom/constants.py`, `headroom/enums.py`, `headroom/types.py`, `headroom/utils.py`, `headroom/output.py` | Whichever contract owns the value you are changing | The consumer. These modules hold no behavior of their own; a constant is normative wherever it is consumed. |
 | `test_environment/modules/` | [`contracts/terraform.md`](spec/contracts/terraform.md), [`contracts/policy-model.md`](spec/contracts/policy-model.md), the affected `checks/*` documents | - |
 | `tests/` | [`verification/strategy.md`](spec/verification/strategy.md) | - |
 | `spec/checks/` | [`checks/index.md`](spec/checks/index.md) | `tests/test_spec_corpus.py` for what is mechanically enforced. |
 | Prose in any `.md`, with no behavior change | The owner named in [`spec/README.md`](spec/README.md) | No implementation file is implicated. `tests/test_documentation_links.py` fails on a relative link whose target is missing, and `tests/test_spec_corpus.py` on a malformed or missing check specification; run those two in place of `tox`. |
+
+Two things no row can key on:
+
+- **A change to how something fails also touches
+  [`spec/architecture/aws-execution.md`](spec/architecture/aws-execution.md).** It
+  owns the general failure policy, so a new tolerated exception, a widened
+  `except`, or a moved `try` changes it whatever file you edited.
+- **Correcting a claim in one specification means checking whether another states
+  the same thing.** A documentation-only fix matches no path row at all.
+  `aws-execution.md` has twice been the document left stale by a correction made
+  elsewhere — once for tag tolerance, once for the top-level `try`.
 
 ## Conventions
 
