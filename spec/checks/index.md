@@ -85,16 +85,18 @@ which side is right.
 
 **The numbers are stable identifiers, not positions.** They are cited from the
 check documents, so a resolved conflict leaves its number retired rather than
-renumbering the rest. Conflicts 1 and 2 are gone from this table because they
-were fixed, which is why the list starts at 3: `deny_iam_saml_provider_not_aws_sso`
-now writes the `violations` count placement reads, and `deny_iam_user_creation`
-now leaves its policy off rather than rendering an empty `NotResource`.
+renumbering the rest. Three are retired, which is why the list starts at 4:
+
+| Retired | Was | Fixed by |
+|---|---|---|
+| 1 | `deny_iam_saml_provider_not_aws_sso` reported no violation count | It now writes the count placement reads |
+| 2 | `deny_iam_user_creation` rendered an empty `NotResource` | It now leaves its policy off instead |
+| 3 | `deny_sqs_third_party_access` skipped an unparseable queue policy | It now aborts, as every other resource-policy analyzer does |
 
 | # | Where | Conflict |
 |---|---|---|
-| 3 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | An unparseable queue policy is logged and skipped rather than blocking the account, against INV-01. Every other analyzer aborts. |
 | 4 | [`deny_ecr_third_party_access`](rcps/deny_ecr_third_party_access.md), [`deny_kms_third_party_access`](rcps/deny_kms_third_party_access.md), [`deny_secrets_manager_third_party_access`](rcps/deny_secrets_manager_third_party_access.md), [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `Federated` principal aborts the whole run. It supplies no `aws:PrincipalAccount`, so it blocks the account exactly as a wildcard does — which is how [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records it. Four checks stop the run where one reports. |
-| 4b | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `CanonicalUser` principal raises `UnknownPrincipalTypeError`, which SQS alone catches and skips, so the account can still be cleared. ECR and KMS let that exception abort. Secrets Manager aborts too, but on `UnsupportedPrincipalTypeError`, raised before extraction is reached. [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records the principal as a violation and does not abort at all. This is conflict 3 in a second guise and the worse of the two outcomes: an unreadable principal counted as no finding, against INV-01. |
+| 4b | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | A `CanonicalUser` principal raises `UnknownPrincipalTypeError`, which SQS alone catches and skips, so the account can still be cleared. ECR and KMS let that exception abort. Secrets Manager aborts too, but on `UnsupportedPrincipalTypeError`, raised before extraction is reached. [`deny_s3_third_party_access`](rcps/deny_s3_third_party_access.md) records the principal as a violation and does not abort at all. An unreadable principal counted as no finding, against INV-01. This is what retired conflict 3 was, in a second guise, and the worse of the two: unparseable JSON meant Headroom had misread the attribute, where an unrecognized principal key is a document AWS accepted and this analyzer does not model. |
 | 5 | [`deny_eks_create_cluster_without_tag`](scps/deny_eks_create_cluster_without_tag.md) | The tag key is matched case-sensitively; IAM matches `aws:RequestTag/PavedRoad` case-insensitively. Conservative in direction, but inconsistent with [`deny_ec2_imds_v1`](scps/deny_ec2_imds_v1.md), where the asymmetry was measured. |
 | 6 | [`deny_sqs_third_party_access`](rcps/deny_sqs_third_party_access.md) | `actions_by_third_party_account` includes in-organization accounts. A reporting defect only; the allowlist is built from a filtered field. |
 

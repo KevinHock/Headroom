@@ -62,8 +62,8 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | Compliant | Third-party account IDs only | `COMPLIANT` |
 | Exemption | — | Never produced |
 | Not recorded | The queue has no policy | Not in the output |
-| Aborts | A `Federated` principal | The run aborts |
-| Silently dropped | Unparseable policy JSON, or an unrecognized principal key | Logged at warning and skipped |
+| Aborts | A `Federated` principal, or unparseable policy JSON | The run aborts |
+| Silently dropped | An unrecognized principal key | Logged at warning and skipped |
 
 ## Failure behavior
 
@@ -74,26 +74,30 @@ Permitted principal types are `AWS`, `Service`, and `Federated`.
 | Any other `ClientError` in any region | Logged and re-raised, aborting the run |
 | `Statement` neither object nor list | `MalformedPolicyError`, aborting the run |
 | A `Federated` principal | `UnsupportedPrincipalTypeError`, aborting the run |
-| Unparseable policy JSON, or `UnknownPrincipalTypeError` | **Logged at warning; the queue is skipped** |
+| Unparseable policy JSON | `json.JSONDecodeError`, aborting the run |
+| An unrecognized principal key | `UnknownPrincipalTypeError`, **logged at warning; the queue is skipped** |
 
-## Known conflict: an unreadable queue policy or principal is skipped
+## Known conflict: an unrecognized principal key is skipped
 
 The last row of the table above is a divergence from every other analyzer, and
-it runs against INV-01: a queue whose policy could not be read is dropped rather
-than blocking the account, so the account can be cleared for the RCP on the
-strength of a queue nobody managed to evaluate. Elsewhere, an unparseable policy
-aborts.
+it runs against INV-01: a queue whose principal could not be read is dropped
+rather than blocking the account, so the account can be cleared for the RCP on
+the strength of a queue nobody managed to evaluate.
 
-That row covers two distinct inputs. Unparseable policy JSON is conflict 3. A
-`CanonicalUser` principal is conflict 4b, and is the worse of the two: this is
-the only analyzer that catches `UnknownPrincipalTypeError`, so a principal no
-allowlist can express is counted as no finding at all. ECR and KMS let that same
-exception abort, Secrets Manager aborts on `UnsupportedPrincipalTypeError`
-instead, and [`deny_s3_third_party_access`](deny_s3_third_party_access.md)
-records the principal as a violation.
+A `CanonicalUser` principal is the case that reaches it. This is the only
+analyzer that catches `UnknownPrincipalTypeError`, so a principal no allowlist
+can express is counted as no finding at all. ECR and KMS let that same exception
+abort, Secrets Manager aborts on `UnsupportedPrincipalTypeError` instead, and
+[`deny_s3_third_party_access`](deny_s3_third_party_access.md) records the
+principal as a violation. Four analyzers, four answers to one question.
+
+Unparseable policy JSON used to reach the same clause and was conflict 3. It now
+aborts, matching every other resource-policy analyzer: `GetQueueAttributes`
+returning a document `json` cannot read is not an ordinary fact about the
+account, because `SetQueueAttributes` validates what it stores.
 
 **Status: unresolved.** Recorded rather than fixed, because raising here changes
-which accounts are cleared. Conflicts 3 and 4b in [`../index.md`](../index.md).
+which accounts are cleared. Conflict 4b in [`../index.md`](../index.md).
 
 ## Known conflict: aborting on a `Federated` principal
 
@@ -150,7 +154,8 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 
 ## Accepted limitations
 
-1. Unparseable policies are dropped rather than blocking; see Failure behavior.
+1. A queue naming an unrecognized principal key is dropped rather than
+   blocking; see Failure behavior.
 2. `actions_by_third_party_account` includes in-organization accounts.
 3. A `Federated` principal aborts rather than blocking.
 4. `Condition`, `Resource`, and `NotAction` are not evaluated.
@@ -169,8 +174,9 @@ RCP placement: blocked at `violations > 0`; the allowlist is the union of
 4. A queue with no `Policy` attribute → skipped.
 5. A queue deleted between listing and reading → skipped.
 6. `AccessDenied` in one region → the run aborts.
-7. A queue whose policy is not valid JSON → logged and skipped; the account can
-   still be cleared. This is limitation 1.
+7. A queue whose policy is not valid JSON → the run aborts.
+8. A queue naming a `CanonicalUser` principal → logged and skipped; the account
+   can still be cleared. This is limitation 1.
 
 ## Referenced invariants
 

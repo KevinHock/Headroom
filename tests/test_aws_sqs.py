@@ -849,20 +849,19 @@ class TestAnalyzeSQSQueuePolicies:
         assert results[0].queue_arn == live_arn
         assert results[0].third_party_account_ids == {"222222222222"}
 
-    def test_json_decode_error(self) -> None:
-        """Test that JSON decode errors are handled gracefully."""
-        mock_session = MagicMock()
-        mock_ec2_client = MagicMock()
-        mock_sqs_client = MagicMock()
+    def test_unparseable_policy_aborts_the_run(self) -> None:
+        """
+        A queue policy that is not valid JSON aborts rather than being skipped.
 
-        mock_session.client.side_effect = lambda service, **kwargs: {
-            "ec2": mock_ec2_client,
-            "sqs": mock_sqs_client,
-        }.get(service)
-
-        mock_ec2_client.describe_regions.return_value = {
-            "Regions": [{"RegionName": "us-east-1"}]
-        }
+        Skipping dropped the queue from the results, so an account whose only
+        third-party grant sat in that queue parsed as having no findings and was
+        cleared for the RCP - absence of evidence read as evidence of safety
+        (INV-01). A policy that GetQueueAttributes returns and json cannot read
+        is not an ordinary fact about the account either: SetQueueAttributes
+        validates the document, so this means Headroom read the attribute wrong
+        or something upstream is broken.
+        """
+        mock_session, mock_sqs_client = self._single_region_session()
 
         queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/test-queue"
         queue_arn = "arn:aws:sqs:us-east-1:111111111111:test-queue"
@@ -871,18 +870,51 @@ class TestAnalyzeSQSQueuePolicies:
         paginator.paginate.return_value = [{"QueueUrls": [queue_url]}]
         mock_sqs_client.get_paginator.return_value = paginator
 
-        # Invalid JSON
         mock_sqs_client.get_queue_attributes.return_value = {
             "Attributes": {
                 "Policy": "{invalid json",
-                "QueueArn": queue_arn
+                "QueueArn": queue_arn,
             }
         }
 
-        org_account_ids = {"111111111111"}
-        results = analyze_sqs_queue_policies(mock_session, org_account_ids)
+        with pytest.raises(json.JSONDecodeError):
+            analyze_sqs_queue_policies(mock_session, {"111111111111"})
 
-        assert len(results) == 0
+    def test_unrecognized_principal_key_drops_the_queue(self) -> None:
+        """
+        A `CanonicalUser` principal is logged and skipped, clearing the account.
+
+        This is conflict 4b, still unresolved, and it had no test of its own
+        until the unparseable-JSON case stopped sharing the clause with it. The
+        queue vanishes from the results, so an account whose only third-party
+        grant sits here reports no findings and the RCP attaches over it.
+        Pinned so that resolving 4b has to change a test that says what it costs.
+        """
+        mock_session, mock_sqs_client = self._single_region_session()
+
+        queue_url = "https://sqs.us-east-1.amazonaws.com/111111111111/test-queue"
+        queue_arn = "arn:aws:sqs:us-east-1:111111111111:test-queue"
+
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{"QueueUrls": [queue_url]}]
+        mock_sqs_client.get_paginator.return_value = paginator
+
+        mock_sqs_client.get_queue_attributes.return_value = {
+            "Attributes": {
+                "Policy": json.dumps({
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {"CanonicalUser": "d" * 64},
+                        "Action": "sqs:SendMessage",
+                        "Resource": queue_arn,
+                    }],
+                }),
+                "QueueArn": queue_arn,
+            }
+        }
+
+        assert analyze_sqs_queue_policies(mock_session, {"111111111111"}) == []
 
 
 class TestPolicyGrammar:

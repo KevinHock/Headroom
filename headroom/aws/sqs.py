@@ -289,6 +289,7 @@ def _analyze_queues_in_region(
     Raises:
         ClientError: If listing queues, or reading a queue's attributes for any
             reason other than the queue having been deleted mid-scan, fails
+        json.JSONDecodeError: If a queue's policy is not valid JSON
         UnsupportedPrincipalTypeError: If Federated principals are found
     """
     sqs_client: SQSClient = session.client("sqs", region_name=region)
@@ -334,7 +335,13 @@ def _analyze_queues_in_region(
                     results.append(result)
                 except UnsupportedPrincipalTypeError:
                     raise
-                except (json.JSONDecodeError, UnknownPrincipalTypeError) as e:
+                # An unrecognized principal key is still skipped, which clears
+                # the account on the strength of a queue nobody could read.
+                # That is conflict 4b, unresolved, and narrowing this clause to
+                # fix unparseable JSON deliberately left it alone rather than
+                # resolving it by accident. See
+                # spec/checks/rcps/deny_sqs_third_party_access.md.
+                except UnknownPrincipalTypeError as e:
                     logger.warning(f"Failed to analyze queue {queue_url} in {region}: {e}")
                     continue
 
@@ -375,6 +382,7 @@ def analyze_sqs_queue_policies(
 
     Raises:
         ClientError: If any region's queues cannot be read
+        json.JSONDecodeError: If any queue's policy is not valid JSON
         UnsupportedPrincipalTypeError: If Federated principals found in any queue
     """
     all_results: List[SQSQueuePolicyAnalysis] = []

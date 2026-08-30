@@ -155,7 +155,7 @@ Two deliberate exceptions, both narrow:
 | Tolerated | Why |
 |---|---|
 | Any `ClientError` fetching an account's tags | The values are labels, not evidence; the account takes documented fallbacks and no policy decision reads them. Wider than intended — see [`../contracts/configuration.md`](../contracts/configuration.md) |
-| Per-region and per-resource errors inside a check | Specified per check, and each such case is reported in that check's result rather than silently dropped |
+| Per-region and per-resource errors inside a check | Specified per check. Each such case is meant to be reported in that check's result rather than silently dropped, and one still is not: [`deny_sqs_third_party_access`](../checks/rcps/deny_sqs_third_party_access.md) drops a queue naming an unrecognized principal key, which is conflict 4b |
 
 `main` catches `ValueError`, `RuntimeError`, and `ClientError` around
 organization discovery, Terraform generation, and reconciliation, printing a
