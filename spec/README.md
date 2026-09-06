@@ -74,12 +74,15 @@ Deliberately **outside** the corpus, and never normative:
 
 | Document | Holds |
 |---|---|
-| [`../documentation/SETUP.md`](../documentation/SETUP.md) | Operator setup: roles, credentials, troubleshooting |
+| [`../README.md`](../README.md) | Landing page: the safety promise in brief, what a run produces, how to start |
+| [`../documentation/SETUP.md`](../documentation/SETUP.md) | Operator setup: roles, credentials, config parameters, what a run leaves behind, the CLI, troubleshooting |
 | [`../documentation/EXAMPLES.md`](../documentation/EXAMPLES.md) | Illustrative output |
 | [`../test_environment/README.md`](../test_environment/README.md) | Live-test topology, execution, cost, cleanup |
 | [`../ROADMAP.md`](../ROADMAP.md) | Future work |
 | [`../HOW_TO_ADD_A_CHECK.md`](../HOW_TO_ADD_A_CHECK.md) | Authoring runbook for a new check |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Contributor workflow: running the suite, the quality bar, adding a check |
 | [`../CLAUDE.md`](../CLAUDE.md) | How to work here: truth hierarchy, routing by touched path, what counts as done |
+| [`../CONVENTIONS.md`](../CONVENTIONS.md) | Code conventions, imported by `CLAUDE.md`: fail-fast, imports, single-source defaults, fake identifiers |
 
 ## Routing
 
