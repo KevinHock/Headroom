@@ -1390,6 +1390,12 @@ must_modify:
     do_not: "Edit generate_scps.py or generate_rcps.py. Both render from the registry; a hand-written branch is what INV-13 forbids."
     enforced_by: "test_generic_pipeline_modules_name_no_check fails if a generic module names a check."
 
+  - path: README.md
+    add_row: "the Checks table: the name linked to spec/checks/{type}/{check_name}.md, what it denies, what its allowlist is drawn from"
+    location: "alphabetical within the SCP block, then within the RCP block; deny_service_confused_deputy stays last because it narrows the six RCP rows above it"
+    also_edit: "the two counts in the prose around the table: how many checks ship, and how many are SCPs and how many RCPs"
+    enforced_by: "tests/test_readme.py names the check until the link exists and fails until both counts match the registry. Nothing checks the row order."
+
 # A check whose SCP statement is scoped by an allowlist needs EVERY step
 # below. Stop short anywhere and the check still reports 100% compliance,
 # the SCP is still enabled, and the allowlist renders empty - which for a

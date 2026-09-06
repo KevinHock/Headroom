@@ -265,6 +265,12 @@ def test_records_every_file_an_identifier_appears_in(tmp_path: Path) -> None:
     assert account_ids_by_location(tmp_path) == {FABRICATED: ["a.tf", "b.md"]}
 
 
+def test_reads_an_svg(tmp_path: Path) -> None:
+    (tmp_path / "placement.svg").write_text(f"<svg><text>account {FABRICATED}</text></svg>\n")
+
+    assert account_ids_by_location(tmp_path) == {FABRICATED: ["placement.svg"]}
+
+
 def test_ignores_placeholders(tmp_path: Path) -> None:
     (tmp_path / "a.tf").write_text('owner = "111111111111"\n')
 

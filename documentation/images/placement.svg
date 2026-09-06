@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="736" viewBox="0 0 820 736" role="img" aria-labelledby="placement-title">
+  <title id="placement-title">Headroom placement recommendations for three checks: one SCP at the organization root, one SCP at an OU, and one RCP at an OU</title>
+  <rect width="820" height="736" rx="10" fill="#1b1f27"/>
+  <path d="M0 10a10 10 0 0 1 10-10h800a10 10 0 0 1 10 10v26H0z" fill="#2a2f3a"/>
+  <circle cx="20" cy="18" r="6" fill="#ff5f57"/>
+  <circle cx="40" cy="18" r="6" fill="#febc2e"/>
+  <circle cx="60" cy="18" r="6" fill="#28c840"/>
+  <text x="410" y="23" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#98a0b2">headroom</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" xml:space="preserve">
+    <text x="24" y="62" fill="#d6dbe5">$ python -m headroom --config sample_config.yaml</text>
+    <text x="24" y="98" fill="#7aa2f7">================================================================================</text>
+    <text x="24" y="116" fill="#7aa2f7" font-weight="bold">SCP PLACEMENT RECOMMENDATIONS</text>
+    <text x="24" y="134" fill="#7aa2f7">================================================================================</text>
+    <text x="24" y="170" fill="#9ece6a" font-weight="bold">Check: deny_ec2_ami_owner</text>
+    <text x="24" y="206" fill="#e0af68">  Recommended Level: ROOT</text>
+    <text x="24" y="224" fill="#d6dbe5">  Affected Accounts: 4</text>
+    <text x="24" y="242" fill="#d6dbe5">  Compliance (affected accounts): 100.0%</text>
+    <text x="24" y="260" fill="#d6dbe5">  Reasoning: 4 of 6 accounts reached by root were analyzed, all with zero violations - safe to</text>
+    <text x="24" y="278" fill="#d6dbe5">             deploy at root level; 2 accounts were not analyzed and will inherit it</text>
+    <text x="24" y="296" fill="#8b93a5">  --------------------------------------</text>
+    <text x="24" y="332" fill="#9ece6a" font-weight="bold">Check: deny_rds_unencrypted</text>
+    <text x="24" y="368" fill="#e0af68">  Recommended Level: OU</text>
+    <text x="24" y="386" fill="#d6dbe5">  Target OU: high_value_assets (ou-1111-11111111)</text>
+    <text x="24" y="404" fill="#d6dbe5">  Affected Accounts: 2</text>
+    <text x="24" y="422" fill="#d6dbe5">  Compliance (affected accounts): 100.0%</text>
+    <text x="24" y="440" fill="#d6dbe5">  Reasoning: All 2 accounts under OU 'high_value_assets', including those in its child OUs, were</text>
+    <text x="24" y="458" fill="#d6dbe5">             analyzed, all with zero violations - safe to deploy at OU level</text>
+    <text x="24" y="476" fill="#8b93a5">  --------------------------------------</text>
+    <text x="24" y="512" fill="#7aa2f7">================================================================================</text>
+    <text x="24" y="530" fill="#7aa2f7" font-weight="bold">RCP PLACEMENT RECOMMENDATIONS</text>
+    <text x="24" y="548" fill="#7aa2f7">================================================================================</text>
+    <text x="24" y="584" fill="#9ece6a" font-weight="bold">Check: deny_sts_third_party_assumerole</text>
+    <text x="24" y="620" fill="#e0af68">  Recommended Level: OU</text>
+    <text x="24" y="638" fill="#d6dbe5">  Target OU: acme_acquisition (ou-2222-22222222)</text>
+    <text x="24" y="656" fill="#d6dbe5">  Affected Accounts: 2</text>
+    <text x="24" y="674" fill="#d6dbe5">  Third-Party Accounts: 1</text>
+    <text x="24" y="692" fill="#d6dbe5">  Reasoning: OU 'acme_acquisition' with 2 accounts can be protected with OU-level RCP (allowlist</text>
+    <text x="24" y="710" fill="#d6dbe5">             contains 1 third-party accounts from union of account requirements)</text>
+  </g>
+</svg>

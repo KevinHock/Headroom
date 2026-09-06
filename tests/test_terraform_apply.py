@@ -273,11 +273,12 @@ def test_an_unrelated_symlink_is_left_alone(tmp_path: Path) -> None:
 
 def test_a_symlink_to_a_live_marked_file_is_left_alone(tmp_path: Path) -> None:
     """
-    README.md promises every symlink but the reserved one is left alone. The
-    dangling link above never reaches the ownership test -- `is_file` is
-    already False -- so only a link whose target really exists and really
-    carries the marker exercises the symlink check itself. Reading through
-    such a link finds the marker and deletes an operator's link.
+    spec/contracts/terraform.md promises every symlink but the reserved one
+    is left alone. The dangling link above never reaches the ownership test
+    -- `is_file` is already False -- so only a link whose target really
+    exists and really carries the marker exercises the symlink check itself.
+    Reading through such a link finds the marker and deletes an operator's
+    link.
     """
     scps, rcps = dirs(tmp_path)
     modules = tmp_path / "modules"

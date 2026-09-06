@@ -96,11 +96,14 @@ _UNSCANNED_DIRECTORIES = frozenset({
 # search engine would ever surface. `.example` is here because a file that
 # exists to be copied and filled in is exactly where someone pastes a real
 # value: `test_environment/terraform.tfvars.example` is the one such file.
+# `.svg` is here because an image file can still be text: the README's terminal
+# render under `documentation/images/` carries OU IDs as `<text>` elements.
 _SCANNED_SUFFIXES = frozenset({
     ".example",
     ".json",
     ".md",
     ".py",
+    ".svg",
     ".tf",
     ".tfvars",
     ".txt",
