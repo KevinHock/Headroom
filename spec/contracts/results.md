@@ -352,15 +352,74 @@ account.
 ## Ordering and stability
 
 Result files are written with `indent=2` and a trailing newline so they can be
-committed and diffed. Two runs against unchanged infrastructure should produce
-files that differ in `summary.scanned_at` and nowhere else; a check that emits
-unordered collections makes its own output churn and should sort them.
+committed and diffed. Two runs against unchanged infrastructure produce
+files that differ in `summary.scanned_at` and nowhere else.
+
+**An evidence entry sorts by its fields in authored order.** Every entry in one
+list comes from a single dict literal in that check's `categorize_result`, so
+the positions line up across entries, and the field written first is the one
+the list orders by. Three checks write a grouping field first —
+`deny_ecr_third_party_access` its `scope`, `deny_service_confused_deputy` its
+`resource_type`, `deny_ec2_imds_v1` its `region` — so their entries group
+before they identify, and each check's own document states the shape. Every
+other check writes the resource's identifier first.
+`BaseCheck.execute` applies this to `violations`,
+`exemptions`, and `compliant` for all sixteen checks; the six checks that
+override `_build_results_data` rename and concatenate those lists, both
+order-preserving, so they inherit it without naming it. A concatenation such as
+`violations + compliant` is therefore sorted within each segment rather than
+globally, which is deterministic — sorting across the join would be cosmetic
+and would cost the violations-first reading order.
+
+Ordering by the first authored field rather than by an alphabetically-first
+key is what keeps a later field addition from reordering every file in a check.
+Inserting a field at position 0 does reorder them, and shows up in the same
+diff.
+
+**A list of records nested inside an entry sorts by the same key as the entry
+list holding it.** `entry_sort_key` in `headroom/checks/base.py` is that one
+key, applied by `BaseCheck.execute` to the three evidence lists and reached
+directly by any check that nests a list of records inside an entry — which is
+why it is public. Sorting the entries does nothing for a list inside one of
+them, so such a list would otherwise keep the order its API paginated in.
+`deny_kms_third_party_access` is the case that exists today: its `grants` and
+`unresolved_grants` would carry `ListGrants` pagination order, and `grant_id`
+is the first authored field of both shapes, so both sort by grant ID. A nested
+list of plain strings is not a record list and does not use this — a check
+sorts those where it collects them.
+
+**A map a check builds keyed by an identifier sorts by key and by value.** A
+record keeps its authored order. The two are different things, and the file
+draws the line where a reader would: `actions_by_third_party_account` is a
+collection whose key order records only which resource named the account
+first, while an entry's `bucket_name, bucket_arn, third_party_account_ids, …`
+is a record whose field order was chosen to be read. This governs how a check
+constructs the map, not how the writer serializes it — `write_check_results`
+does not pass `sort_keys=True`, which would alphabetize `summary` and every
+record along with the maps, in files this contract elsewhere says exist for a
+person to open. `sorted_values_by_account` in `headroom/checks/base.py` is the
+one way these maps are built, in all five checks that build one.
+
+That helper takes values that are sets or lists of strings, and `mypy` rejects
+a map whose values are anything else — a plain `str` included, which is itself
+an iterable of strings and would otherwise come back as a sorted list of
+characters. Two maps do not fit it and are key-sorted where they are built
+instead. `deny_eks_create_cluster_without_tag`'s `tags`, copied from
+`DescribeCluster`, has string values; its keys are a customer's tag names, so
+it is a set-like collection with no authored order to preserve.
+`deny_ec2_ami_owner`'s `unknown_ami_owners` has integer values; its keys are
+the reasons an owner could not be resolved, and without the sort they would
+fall in the order the first instance carrying each reason sorted to.
 
 `scanned_at` is the one field expected to differ between runs, and it differs in
-every file of every run. That is the cost of recording when a scan happened, and
-it is paid deliberately: a one-line diff per file still reads as "nothing
-changed", while suppressing the timestamp in the artifact that gets committed
-would mean the committed files are the ones that cannot say how old they are.
-The worked examples under `test_environment/headroom_results/` pick the key up
-on the next real scan; hand-writing a value into them would state a scan time
-that never happened.
+every file a run writes. A re-run over an existing results directory writes
+none: `results_exist` skips the check before `execute` is reached, so the file
+on disk keeps the timestamp of the scan that produced it. The divergence
+appears on a fresh scan — a deleted results directory, a new account, a newly
+registered check — which is also the run whose diff an operator reads. That is
+the cost of recording when a scan happened, and it is paid deliberately: a
+one-line diff per file still reads as "nothing changed", while suppressing the
+timestamp in the artifact that gets committed would mean the committed files
+are the ones that cannot say how old they are. The worked examples under
+`test_environment/headroom_results/` pick the key up on the next real scan;
+hand-writing a value into them would state a scan time that never happened.

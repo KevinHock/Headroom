@@ -165,7 +165,7 @@ Base document shape. Summary fields beyond the common three:
 |---|---|
 | `total_instances`, `violations`, `compliant`, `compliance_percentage` | Counts |
 | `unique_ami_owners` | Sorted allowlist values observed — alias where present, else numeric ID |
-| `unknown_ami_owners` | `{reason: count}` |
+| `unknown_ami_owners` | `{reason: count}`, keyed in sorted order |
 
 Entry shape: `instance_id`, `region`, `ami_id`, `ami_owner`, `ami_owner_alias`,
 `ami_name`, `owner_unknown_reason`.

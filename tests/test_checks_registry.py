@@ -1,10 +1,11 @@
 """Tests for headroom.checks.registry module."""
 
+import ast
 import io
 import re
 import tokenize
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Set
 
 import pytest
 import headroom.checks.registry
@@ -850,3 +851,64 @@ def test_generic_pipeline_modules_name_no_check() -> None:
         "headroom/terraform/parameters.py",
     } <= set(named)
     assert named == {path: [] for path in _GENERIC_PIPELINE_MODULES}
+
+
+def modules_with_a_dict_comprehension(*package_directories: str) -> Set[str]:
+    """
+    Repository-relative paths under `package_directories` holding an `ast.DictComp`.
+
+    Each directory is scanned recursively via `python_modules_under`, module
+    by module, parsing its source and walking the tree for the node type
+    directly rather than pattern-matching text.
+
+    Args:
+        package_directories: Repository-relative directories to scan
+
+    Returns:
+        Every module under any of them holding at least one dict
+        comprehension
+    """
+    modules: Set[str] = set()
+    for package_directory in package_directories:
+        for module in python_modules_under(package_directory):
+            tree = ast.parse((REPOSITORY_ROOT / module).read_text())
+            if any(isinstance(node, ast.DictComp) for node in ast.walk(tree)):
+                modules.add(module)
+    return modules
+
+
+def test_no_check_builds_an_account_keyed_map_by_hand() -> None:
+    """
+    A dict comprehension under `scps/` or `rcps/` is a map no check may build.
+
+    The five behavioural `test_the_maps_are_keyed_in_sorted_order` tests
+    prove `sorted_values_by_account` sorts a map it is handed; nothing
+    stopped a future check from building one by hand instead and skipping
+    the sort, which would regress silently and be caught only by that one
+    check's own test - map site #14, and every one after it. This is the
+    structural half of that guard, and it catches one shape: the
+    `{account_id: sorted(actions) for ...}` comprehension that thirteen
+    call sites once held, which sorts values and not keys. A map filled in
+    a loop, or an attribute copied straight into an entry - the EKS `tags`
+    bug - passes it; those are left to each check's behavioural test and to
+    the sweep of committed files in `test_committed_results_examples.py`.
+    A check wanting a genuinely different dict comprehension should come
+    argue with this test rather than route around it.
+    """
+    assert modules_with_a_dict_comprehension("headroom/checks/scps", "headroom/checks/rcps") == set()
+
+
+def test_modules_with_a_dict_comprehension_finds_the_ones_outside_the_check_packages() -> None:
+    """
+    The guard above must be able to name a match, or it proves nothing.
+
+    Neither package it scans holds one today, so this points the same walk
+    one level up instead, at their parent, where three real dict
+    comprehensions already live outside both: `sorted_values_by_account`
+    itself, in `base.py`, and two in `registry.py`. All three are real and
+    permanent, so this needs no fixture built to order.
+    """
+    assert modules_with_a_dict_comprehension("headroom/checks") == {
+        "headroom/checks/base.py",
+        "headroom/checks/registry.py",
+    }

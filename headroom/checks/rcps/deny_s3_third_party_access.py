@@ -12,7 +12,7 @@ from boto3.session import Session
 from ...aws.s3 import S3BucketPolicyAnalysis, analyze_s3_bucket_policies
 from ...constants import DENY_S3_THIRD_PARTY_ACCESS
 from ...enums import CheckCategory, TerraformSection
-from ..base import BaseCheck, CategorizedCheckResult
+from ..base import BaseCheck, CategorizedCheckResult, sorted_values_by_account
 from ..registry import Allowlist, register_check
 
 
@@ -106,10 +106,7 @@ class DenyS3ThirdPartyAccessCheck(BaseCheck[S3BucketPolicyAnalysis]):
         Returns:
             Tuple of (category, result_dict) where category is a CheckCategory enum value
         """
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in result.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(result.actions_by_account)
 
         result_dict = {
             "bucket_name": result.bucket_name,
@@ -154,15 +151,9 @@ class DenyS3ThirdPartyAccessCheck(BaseCheck[S3BucketPolicyAnalysis]):
         )
         buckets_with_third_party_access = buckets_with_wildcards_and_third_party + len(check_result.compliant)
 
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in self.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(self.actions_by_account)
 
-        buckets_by_account_serializable = {
-            account_id: sorted(list(buckets))
-            for account_id, buckets in self.buckets_by_account.items()
-        }
+        buckets_by_account_serializable = sorted_values_by_account(self.buckets_by_account)
 
         return {
             "total_buckets_analyzed": total_buckets,

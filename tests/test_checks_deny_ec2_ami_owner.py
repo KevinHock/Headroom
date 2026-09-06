@@ -9,10 +9,12 @@ import tempfile
 import shutil
 from unittest.mock import MagicMock, patch
 from typing import List, Generator
+from headroom.checks.base import CategorizedCheckResult
 from headroom.checks.scps.deny_ec2_ami_owner import DenyEc2AmiOwnerCheck
 from headroom.constants import DENY_EC2_AMI_OWNER
 from headroom.config import DEFAULT_RESULTS_DIR
 from headroom.aws.ec2 import DenyEc2AmiOwner
+from headroom.types import JsonDict
 
 
 class TestCheckDenyEc2AmiOwner:
@@ -355,9 +357,6 @@ class TestCheckDenyEc2AmiOwner:
 
     def test_build_summary_fields_with_unknown_owner(self, temp_results_dir: str) -> None:
         """Unknown owners are counted separately and kept out of unique_ami_owners."""
-        from headroom.checks.base import CategorizedCheckResult
-        from headroom.types import JsonDict
-
         violations: list[JsonDict] = [
             {
                 "instance_id": "i-11111111111111111",
@@ -404,11 +403,41 @@ class TestCheckDenyEc2AmiOwner:
         assert summary["unique_ami_owners"] == ["amazon"]
         assert summary["unknown_ami_owners"] == {"not_visible": 1}
 
+    def test_unknown_ami_owners_is_keyed_in_sorted_order(self, temp_results_dir: str) -> None:
+        """
+        The reasons are keyed in sorted order, not in the order the instances carrying them arrived.
+
+        `not_visible` is written first here and sorts second: a map built by
+        first appearance would key it first, so the file would change whenever
+        the instance that sorts first changed reason. The expected key order is
+        a literal, not a sort.
+        """
+        unknown = {
+            "ami_owner": None,
+            "ami_owner_alias": None,
+            "region": "us-west-2",
+            "ami_name": None,
+        }
+        violations: List[JsonDict] = [
+            {"instance_id": "i-11111111111111111", "ami_id": "ami-11111111111111111", "owner_unknown_reason": "not_visible", **unknown},
+            {"instance_id": "i-22222222222222222", "ami_id": "ami-22222222222222222", "owner_unknown_reason": "deregistered", **unknown},
+            {"instance_id": "i-33333333333333333", "ami_id": "ami-33333333333333333", "owner_unknown_reason": "not_visible", **unknown},
+        ]
+        check_result = CategorizedCheckResult(violations=violations, exemptions=[], compliant=[], summary={})
+        check = DenyEc2AmiOwnerCheck(
+            check_name=DENY_EC2_AMI_OWNER,
+            account_name="test",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+        )
+
+        summary = check.build_summary_fields(check_result)
+
+        assert list(summary["unknown_ami_owners"]) == ["deregistered", "not_visible"]
+        assert summary["unknown_ami_owners"] == {"deregistered": 1, "not_visible": 2}
+
     def test_build_summary_fields(self, temp_results_dir: str) -> None:
         """Test summary fields calculation."""
-        from headroom.checks.base import CategorizedCheckResult
-        from headroom.types import JsonDict
-
         violations: list[JsonDict] = []
         compliant: list[JsonDict] = [
             {

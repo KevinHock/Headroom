@@ -6,10 +6,11 @@ pattern for all compliance checks (SCP, RCP, etc.). Concrete checks only need to
 implement three methods: analyze(), categorize_result(), and build_summary_fields().
 """
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Generic, List, TypeVar
+from typing import AbstractSet, Any, Dict, Generic, List, Mapping, TypeVar, Union
 
 from boto3.session import Session
 
@@ -35,6 +36,65 @@ class CategorizedCheckResult:
     exemptions: List[JsonDict]
     compliant: List[JsonDict]
     summary: JsonDict
+
+
+def entry_sort_key(entry: Mapping[str, object]) -> List[str]:
+    """
+    Order one record by its fields in the order they were written.
+
+    Every entry in one list comes from a single dict literal in that check's
+    `categorize_result`, so the positions line up across entries, and the
+    field written first is the one the list orders by: the resource's
+    identifier in most checks, and a grouping field -- `scope`,
+    `resource_type`, `region` -- in the checks whose entries group before
+    they identify. Serializing each value keeps the key a list of strings
+    whatever the field holds, so a `None` beside a `str` at the same
+    position across two entries -- one RCP check's finding carries fields
+    that are each `None` on some findings and a `str` on others -- has no
+    comparison to lose. Two entries of unequal length compare on the fields
+    they share and then on length, which the same serialization gives for
+    free. `default=str` matches what the writer already passes to
+    `json.dump`.
+
+    A list of records nested inside an entry is ordered by this same rule,
+    which is why the function is public: sorting the entries leaves such a
+    list in the arrival order its API paginated it in, and a second rule
+    would be a second thing to keep true. The parameter is a read-only
+    `Mapping` rather than `JsonDict` so that such a call site can hand over
+    a dict literal whose value type is narrower than `object`, which
+    invariant `Dict` would reject.
+
+    Args:
+        entry: One record, as the check's `categorize_result` built it
+
+    Returns:
+        The record's values serialized, in authored order
+    """
+    return [json.dumps(value, sort_keys=True, default=str) for value in entry.values()]
+
+
+def sorted_values_by_account(values_by_account: Mapping[str, Union[AbstractSet[str], List[str]]]) -> Dict[str, List[str]]:
+    """
+    Order a map keyed by account ID, and each account's values with it.
+
+    A map keyed by an identifier is a set-like collection: its key order is
+    the discovery order of whichever resource named the account first, and
+    carries no meaning. A record is not. The fields of an evidence entry keep
+    the order they were written in, which is why the writer does not pass
+    `sort_keys=True` and alphabetize both alike.
+
+    The values are typed as sets or lists rather than `Iterable[str]`, which
+    a `str` also satisfies: a map of plain strings handed to this function
+    would come back as a map of sorted character lists, and `mypy` is what
+    stops that at the call site.
+
+    Args:
+        values_by_account: Values collected under each third-party account ID, as a set or a list
+
+    Returns:
+        The same map, keyed in sorted order, each account's values sorted
+    """
+    return {account_id: sorted(values) for account_id, values in sorted(values_by_account.items())}
 
 
 class BaseCheck(ABC, Generic[T]):
@@ -139,9 +199,10 @@ class BaseCheck(ABC, Generic[T]):
         This method orchestrates the entire check execution flow:
         1. Analyze: Call AWS APIs to gather data
         2. Categorize: Process each result into violations/exemptions/compliant
-        3. Summarize: Build summary with check-specific fields
-        4. Write: Save results to JSON file
-        5. Log: Print completion message
+        3. Order: Sort each of the three lists by `entry_sort_key`
+        4. Summarize: Build summary with check-specific fields
+        5. Write: Save results to JSON file
+        6. Log: Print completion message
 
         Args:
             session: boto3 Session with appropriate permissions
@@ -160,6 +221,10 @@ class BaseCheck(ABC, Generic[T]):
                 exemptions.append(result_dict)
             elif category == CheckCategory.COMPLIANT:
                 compliant.append(result_dict)
+
+        violations.sort(key=entry_sort_key)
+        exemptions.sort(key=entry_sort_key)
+        compliant.sort(key=entry_sort_key)
 
         check_result = CategorizedCheckResult(
             violations=violations,

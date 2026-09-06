@@ -11,20 +11,20 @@
   "exemptions": [],
   "compliant_instances": [
     {
-      "db_identifier": "encrypted-cluster-instance-1",
-      "db_type": "instance",
-      "region": "us-east-1",
-      "engine": "aurora-mysql",
-      "encrypted": true,
-      "db_arn": "arn:aws:rds:us-east-1:REDACTED:db:encrypted-cluster-instance-1"
-    },
-    {
       "db_identifier": "encrypted-cluster",
       "db_type": "cluster",
       "region": "us-east-1",
       "engine": "aurora-mysql",
       "encrypted": true,
       "db_arn": "arn:aws:rds:us-east-1:REDACTED:cluster:encrypted-cluster"
+    },
+    {
+      "db_identifier": "encrypted-cluster-instance-1",
+      "db_type": "instance",
+      "region": "us-east-1",
+      "engine": "aurora-mysql",
+      "encrypted": true,
+      "db_arn": "arn:aws:rds:us-east-1:REDACTED:db:encrypted-cluster-instance-1"
     }
   ]
 }

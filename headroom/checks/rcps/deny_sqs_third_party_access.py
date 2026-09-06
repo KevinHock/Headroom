@@ -13,7 +13,7 @@ from ...aws.sqs import SQSQueuePolicyAnalysis, analyze_sqs_queue_policies
 from ...constants import DENY_SQS_THIRD_PARTY_ACCESS
 from ...enums import CheckCategory, TerraformSection
 from ...types import JsonDict
-from ..base import BaseCheck, CategorizedCheckResult
+from ..base import BaseCheck, CategorizedCheckResult, sorted_values_by_account
 from ..registry import Allowlist, register_check
 
 
@@ -107,10 +107,7 @@ class DenySQSThirdPartyAccessCheck(BaseCheck[SQSQueuePolicyAnalysis]):
         Returns:
             Tuple of (category, result_dict) where category is a CheckCategory enum value
         """
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in result.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(result.actions_by_account)
 
         result_dict = {
             "queue_url": result.queue_url,
@@ -155,15 +152,9 @@ class DenySQSThirdPartyAccessCheck(BaseCheck[SQSQueuePolicyAnalysis]):
         # - Compliant (specific third-party account IDs)
         queues_with_third_party_access = len(check_result.violations) + len(check_result.compliant)
 
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in self.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(self.actions_by_account)
 
-        queues_by_account_serializable = {
-            account_id: sorted(list(queues))
-            for account_id, queues in self.queues_by_account.items()
-        }
+        queues_by_account_serializable = sorted_values_by_account(self.queues_by_account)
 
         return {
             "total_queues_analyzed": total_queues,

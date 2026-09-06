@@ -13,6 +13,10 @@
     ],
     "third_party_account_count": 3,
     "actions_by_third_party_account": {
+      "999911110000": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
       "999911114444": [
         "s3:GetObject",
         "s3:ListBucket",
@@ -22,22 +26,18 @@
         "s3:*",
         "s3:GetObject",
         "s3:PutObject"
-      ],
-      "999911110000": [
-        "s3:GetObject",
-        "s3:PutObject"
       ]
     },
     "buckets_by_third_party_account": {
+      "999911110000": [
+        "arn:aws:s3:::headroom-test-multiple-third-parties-999911115555"
+      ],
       "999911114444": [
         "arn:aws:s3:::headroom-test-mixed-access-999911115555"
       ],
       "999911116666": [
         "arn:aws:s3:::headroom-test-multiple-third-parties-999911115555",
         "arn:aws:s3:::headroom-test-wildcard-action-999911115555"
-      ],
-      "999911110000": [
-        "arn:aws:s3:::headroom-test-multiple-third-parties-999911115555"
       ]
     }
   },
@@ -68,11 +68,11 @@
       "has_wildcard_principal": false,
       "has_non_account_principals": false,
       "actions_by_account": {
-        "999911116666": [
+        "999911110000": [
           "s3:GetObject",
           "s3:PutObject"
         ],
-        "999911110000": [
+        "999911116666": [
           "s3:GetObject",
           "s3:PutObject"
         ]

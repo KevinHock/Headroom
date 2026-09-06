@@ -406,6 +406,97 @@ class TestDenyS3ThirdPartyAccessCheck:
         assert category == "violation"
         assert result_dict["has_non_account_principals"] is True
 
+    def test_the_maps_are_keyed_in_sorted_order(
+        self,
+        org_account_ids: set[str],
+        temp_results_dir: str,
+    ) -> None:
+        """
+        A map's keys do not record which bucket named an account first, nor its values.
+
+        The three third parties arrive 555, 333, 444, so insertion order and
+        sorted order disagree. 333's actions are a set, whose iteration order
+        is its members' hashes and changes with the interpreter's hash seed,
+        so the value half needs pinning as much as the key half does. Each
+        expected list is written out rather than sorted, so the test and the
+        code cannot agree by construction.
+        """
+        mock_session = MagicMock()
+        analyses = [
+            S3BucketPolicyAnalysis(
+                bucket_name="alpha-bucket",
+                bucket_arn="arn:aws:s3:::alpha-bucket",
+                third_party_account_ids={"555555555555", "333333333333"},
+                has_wildcard_principal=False,
+                has_non_account_principals=False,
+                actions_by_account={
+                    "555555555555": {"s3:PutObject"},
+                    "333333333333": {
+                        "s3:PutObject",
+                        "s3:GetObject",
+                        "s3:DeleteObject",
+                        "s3:ListBucket",
+                    },
+                },
+            ),
+            S3BucketPolicyAnalysis(
+                bucket_name="beta-bucket",
+                bucket_arn="arn:aws:s3:::beta-bucket",
+                third_party_account_ids={"444444444444"},
+                has_wildcard_principal=False,
+                has_non_account_principals=False,
+                actions_by_account={"444444444444": {"s3:ListBucket"}},
+            ),
+        ]
+
+        with (
+            patch("headroom.checks.rcps.deny_s3_third_party_access.analyze_s3_bucket_policies") as mock_analysis,
+            patch("headroom.checks.base.write_check_results") as mock_write,
+            patch("builtins.print"),
+        ):
+            mock_analysis.return_value = analyses
+
+            check = DenyS3ThirdPartyAccessCheck(
+                check_name=DENY_S3_THIRD_PARTY_ACCESS,
+                account_name="test-account",
+                account_id="111111111111",
+                results_dir=temp_results_dir,
+                org_account_ids=org_account_ids,
+                org_id=ORG_ID,
+            )
+            check.execute(mock_session)
+
+            results_data = mock_write.call_args[1]["results_data"]
+            summary = results_data["summary"]
+
+            assert list(summary["actions_by_third_party_account"]) == [
+                "333333333333",
+                "444444444444",
+                "555555555555",
+            ]
+            assert list(summary["buckets_by_third_party_account"]) == [
+                "333333333333",
+                "444444444444",
+                "555555555555",
+            ]
+            bucket_actions = results_data["buckets_third_parties_can_access"][0]["actions_by_account"]
+            assert list(bucket_actions) == [
+                "333333333333",
+                "555555555555",
+            ]
+            assert bucket_actions["333333333333"] == [
+                "s3:DeleteObject",
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:PutObject",
+            ]
+            assert summary["actions_by_third_party_account"]["333333333333"] == [
+                "s3:DeleteObject",
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:PutObject",
+            ]
+
 
 # One statement whose bare wildcard `aws:PrincipalAccount` bounds to a single
 # account outside the organization. Both tests below read the same statement,

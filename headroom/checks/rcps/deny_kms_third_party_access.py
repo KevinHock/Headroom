@@ -13,7 +13,7 @@ from boto3.session import Session
 from ...aws.kms import KMSKeyPolicyAnalysis, analyze_kms_key_policies
 from ...constants import DENY_KMS_THIRD_PARTY_ACCESS
 from ...enums import CheckCategory, TerraformSection
-from ..base import BaseCheck, CategorizedCheckResult
+from ..base import BaseCheck, CategorizedCheckResult, entry_sort_key, sorted_values_by_account
 from ..registry import Allowlist, register_check
 
 
@@ -138,36 +138,39 @@ class DenyKMSThirdPartyAccessCheck(BaseCheck[KMSKeyPolicyAnalysis]):
             "key_arn": result.key_arn,
             "region": result.region,
             "third_party_account_ids": sorted(list(result.third_party_account_ids)),
-            "actions_by_account": {
-                account_id: sorted(actions)
-                for account_id, actions in result.actions_by_account.items()
-            },
+            "actions_by_account": sorted_values_by_account(result.actions_by_account),
             "has_wildcard_principal": result.has_wildcard_principal,
             "has_non_account_principals": result.has_non_account_principals,
-            "grants": [
-                {
-                    "grant_id": grant.grant_id,
-                    "grantee_account_id": grant.grantee_account_id,
-                    "grantee_principal": grant.grantee_principal,
-                    "grantee_account_id_source": grant.grantee_account_id_source,
-                    "retiring_principal_account_id": (
-                        grant.retiring_principal_account_id
-                    ),
-                    "operations": grant.operations,
-                    "has_constraints": grant.has_constraints,
-                }
-                for grant in result.grants
-            ],
-            "unresolved_grants": [
-                {
-                    "grant_id": grant.grant_id,
-                    "grantee_principal": grant.grantee_principal,
-                    "principal_kind": grant.principal_kind,
-                    "operations": grant.operations,
-                    "has_constraints": grant.has_constraints,
-                }
-                for grant in result.unresolved_grants
-            ],
+            "grants": sorted(
+                [
+                    {
+                        "grant_id": grant.grant_id,
+                        "grantee_account_id": grant.grantee_account_id,
+                        "grantee_principal": grant.grantee_principal,
+                        "grantee_account_id_source": grant.grantee_account_id_source,
+                        "retiring_principal_account_id": (
+                            grant.retiring_principal_account_id
+                        ),
+                        "operations": grant.operations,
+                        "has_constraints": grant.has_constraints,
+                    }
+                    for grant in result.grants
+                ],
+                key=entry_sort_key,
+            ),
+            "unresolved_grants": sorted(
+                [
+                    {
+                        "grant_id": grant.grant_id,
+                        "grantee_principal": grant.grantee_principal,
+                        "principal_kind": grant.principal_kind,
+                        "operations": grant.operations,
+                        "has_constraints": grant.has_constraints,
+                    }
+                    for grant in result.unresolved_grants
+                ],
+                key=entry_sort_key,
+            ),
             "confined_by": sorted(result.confined_by),
         }
 
@@ -223,10 +226,7 @@ class DenyKMSThirdPartyAccessCheck(BaseCheck[KMSKeyPolicyAnalysis]):
             keys_with_wildcards_and_third_party + len(check_result.compliant)
         )
 
-        actions_by_account_sorted = {
-            account_id: sorted(list(actions))
-            for account_id, actions in self.all_actions_by_account.items()
-        }
+        actions_by_account_sorted = sorted_values_by_account(self.all_actions_by_account)
 
         return {
             "total_keys_analyzed": total_keys,

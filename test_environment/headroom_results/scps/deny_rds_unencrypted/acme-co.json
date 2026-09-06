@@ -9,20 +9,20 @@
   },
   "violations": [
     {
-      "db_identifier": "unencrypted-cluster-instance-1",
-      "db_type": "instance",
-      "region": "us-east-1",
-      "engine": "aurora-postgresql",
-      "encrypted": false,
-      "db_arn": "arn:aws:rds:us-east-1:REDACTED:db:unencrypted-cluster-instance-1"
-    },
-    {
       "db_identifier": "unencrypted-cluster",
       "db_type": "cluster",
       "region": "us-east-1",
       "engine": "aurora-postgresql",
       "encrypted": false,
       "db_arn": "arn:aws:rds:us-east-1:REDACTED:cluster:unencrypted-cluster"
+    },
+    {
+      "db_identifier": "unencrypted-cluster-instance-1",
+      "db_type": "instance",
+      "region": "us-east-1",
+      "engine": "aurora-postgresql",
+      "encrypted": false,
+      "db_arn": "arn:aws:rds:us-east-1:REDACTED:db:unencrypted-cluster-instance-1"
     }
   ],
   "exemptions": [],
