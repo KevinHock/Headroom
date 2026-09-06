@@ -482,3 +482,45 @@ class TestCheckDenyEksCreateClusterWithoutTag:
         category, result_dict = check.categorize_result(result)
         assert category == "violation"
         assert result_dict["tags"] == {}
+
+    def test_the_tag_map_is_keyed_in_sorted_order(
+        self,
+        temp_results_dir: str,
+    ) -> None:
+        """
+        A customer's tag map has no authored order for the file to preserve.
+
+        DescribeCluster returns whatever order it returns, so two scans of
+        one unchanged cluster would otherwise write different bytes. The
+        three tags arrive PavedRoad, Owner, Environment, so arrival order and
+        key order disagree, and the expected key list is written out rather
+        than sorted.
+        """
+        check = DenyEksCreateClusterWithoutTagCheck(
+            check_name=DENY_EKS_CREATE_CLUSTER_WITHOUT_TAG,
+            account_name="test",
+            account_id="111111111111",
+            results_dir=temp_results_dir,
+        )
+
+        result = DenyEksCreateClusterWithoutTag(
+            cluster_name="paved-cluster",
+            cluster_arn="arn:aws:eks:us-east-1:111111111111:cluster/paved-cluster",
+            region="us-east-1",
+            tags={"PavedRoad": "true", "Owner": "platform", "Environment": "prod"},
+            has_paved_road_tag=True
+        )
+
+        category, result_dict = check.categorize_result(result)
+
+        assert category == "compliant"
+        assert list(cast(Dict[str, str], result_dict["tags"])) == [
+            "Environment",
+            "Owner",
+            "PavedRoad",
+        ]
+        assert result_dict["tags"] == {
+            "Environment": "prod",
+            "Owner": "platform",
+            "PavedRoad": "true",
+        }

@@ -13,7 +13,7 @@ from boto3.session import Session
 from ...aws.ecr import ECRPolicyAnalysis, analyze_ecr_policies
 from ...constants import DENY_ECR_THIRD_PARTY_ACCESS
 from ...enums import CheckCategory, TerraformSection
-from ..base import BaseCheck, CategorizedCheckResult
+from ..base import BaseCheck, CategorizedCheckResult, sorted_values_by_account
 from ..registry import Allowlist, register_check
 
 
@@ -119,10 +119,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRPolicyAnalysis]):
             "repository_arn": result.repository_arn,
             "region": result.region,
             "third_party_account_ids": sorted(list(result.third_party_account_ids)),
-            "actions_by_account": {
-                account_id: sorted(actions)
-                for account_id, actions in result.actions_by_account.items()
-            },
+            "actions_by_account": sorted_values_by_account(result.actions_by_account),
             "has_wildcard_principal": result.has_wildcard_principal,
             "has_non_account_principals": result.has_non_account_principals,
             "confined_by": sorted(result.confined_by),
@@ -167,10 +164,7 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRPolicyAnalysis]):
             policies_with_wildcards_and_third_party + len(check_result.compliant)
         )
 
-        actions_by_account_sorted = {
-            account_id: sorted(list(actions))
-            for account_id, actions in self.all_actions_by_account.items()
-        }
+        actions_by_account_sorted = sorted_values_by_account(self.all_actions_by_account)
 
         return {
             "total_policies_analyzed": total_policies,
@@ -181,15 +175,6 @@ class DenyECRThirdPartyAccessCheck(BaseCheck[ECRPolicyAnalysis]):
             "third_party_account_count": len(self.all_third_party_accounts),
             "actions_by_account": actions_by_account_sorted,
         }
-
-    def execute(self, session: Session) -> None:
-        """
-        Execute the check.
-
-        Args:
-            session: boto3 Session with appropriate permissions
-        """
-        super().execute(session)
 
     def _build_results_data(
         self,

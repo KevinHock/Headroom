@@ -133,8 +133,8 @@ terraform destroy -target=aws_kms_alias.third_party_vendor_crowdstrike \
     "unique_third_party_accounts": ["999911110000", "999911116666"],
     "third_party_account_count": 2,
     "actions_by_account": {
-      "999911116666": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"],
-      "999911110000": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
+      "999911110000": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"],
+      "999911116666": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
     }
   },
   "keys_third_parties_can_access": [...],

@@ -343,7 +343,12 @@ result file written before it existed lacks the key, and both readers read only
 `grantee_account_id_source`, `retiring_principal_account_id`, `operations`,
 `has_constraints` — and is an empty list on a key whose only third-party access
 is in its policy. `grantee_account_id` is always set on an entry, since a
-grantee outside the organization is what makes one.
+grantee outside the organization is what makes one. The list is ordered by
+`grant_id`, its first authored field, under the rule
+[`../../contracts/results.md`](../../contracts/results.md#ordering-and-stability)
+states for a record list nested inside an entry. `ListGrants` documents no
+order for the grants it pages back, so without it two scans of one unchanged
+key write different bytes.
 
 `grantee_principal` is the complete `GranteePrincipal` exactly as `ListGrants`
 returned it, and `grantee_account_id_source` says which reading produced the
@@ -386,7 +391,8 @@ every other entry. `grantee_principal` is the complete identifier exactly as
 operator has on the grant, and redaction leaves it alone for the reason above.
 `principal_kind` is `iam_role_unique_id` for an `AROA` prefix and
 `iam_user_unique_id` for `AIDA`; `operations` is `kms:`-prefixed and sorted
-like a `grants` entry's, and empty when the grant listed none.
+like a `grants` entry's, and empty when the grant listed none. The list itself
+is ordered by `grant_id` for the same reason a `grants` list is.
 `has_non_account_principals` stays `False`: it reports the policy surface, and
 the grant surface reports itself through this field. The field is additive: a
 result file written before it existed lacks the key, and both readers read only

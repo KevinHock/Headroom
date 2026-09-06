@@ -124,5 +124,5 @@ class DenyEc2AmiOwnerCheck(BaseCheck[DenyEc2AmiOwner]):
             "compliant": len(check_result.compliant),
             "compliance_percentage": compliance_pct,
             "unique_ami_owners": sorted(list(ami_owners)),
-            "unknown_ami_owners": unknown_ami_owners,
+            "unknown_ami_owners": dict(sorted(unknown_ami_owners.items())),
         }

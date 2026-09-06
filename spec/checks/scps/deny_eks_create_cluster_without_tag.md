@@ -108,6 +108,12 @@ parses as `None` for this check. Nothing downstream reads it.
 Entry shape: `cluster_name`, `cluster_arn`, `region`, `tags`,
 `has_paved_road_tag`.
 
+`tags` is the cluster's complete tag map as `DescribeCluster` returned it,
+written key-sorted. A customer's tag names are a set-like collection with no
+authored order for the file to preserve, and `DescribeCluster` guarantees none,
+so ordering them is what keeps two scans of one unchanged cluster writing the
+same bytes ([`../../contracts/results.md`](../../contracts/results.md#ordering-and-stability)).
+
 ## Placement and generated policy
 
 Standard SCP placement at zero violations. Terraform variable

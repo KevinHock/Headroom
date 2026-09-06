@@ -58,7 +58,7 @@ class DenyEksCreateClusterWithoutTagCheck(BaseCheck[DenyEksCreateClusterWithoutT
             "cluster_name": result.cluster_name,
             "cluster_arn": result.cluster_arn,
             "region": result.region,
-            "tags": result.tags,
+            "tags": dict(sorted(result.tags.items())),
             "has_paved_road_tag": result.has_paved_road_tag,
         }
 

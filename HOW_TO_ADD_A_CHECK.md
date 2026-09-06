@@ -876,6 +876,13 @@ fail_fast:
   anti_pattern: "if isinstance(...) ... else: return []"
   principle: Let code crash on bad data with clear errors
 
+result_ordering:
+  rule: Write the field the list should order by first in categorize_result's result dict - the resource identifier, or a grouping field such as region when entries should group before they identify
+  why: "BaseCheck.execute orders evidence lists by each entry's fields in authored order, so the first field is what the file sorts by"
+  maps: Build any map keyed by an account ID with sorted_values_by_account from headroom/checks/base.py, which sorts the keys as well as each account's values
+  guard: tests/test_checks_registry.py fails on any dict comprehension under headroom/checks/scps/ or rcps/, whatever it is keyed by - a map the helper does not fit, such as one with integer or string values, is built with dict(sorted(...)) instead
+  spec: spec/contracts/results.md
+
 test_coverage:
   requirement: 100%
   verify: "coverage run --source=headroom,tests -m pytest tests/ && coverage report --include=headroom/* --show-missing --fail-under=100"

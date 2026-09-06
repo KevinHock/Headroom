@@ -13,7 +13,7 @@ from ...aws.secretsmanager import SecretsPolicyAnalysis, analyze_secrets_manager
 from ...constants import DENY_SECRETS_MANAGER_THIRD_PARTY_ACCESS
 from ...enums import CheckCategory, TerraformSection
 from ...types import JsonDict
-from ..base import BaseCheck, CategorizedCheckResult
+from ..base import BaseCheck, CategorizedCheckResult, sorted_values_by_account
 from ..registry import Allowlist, register_check
 
 
@@ -113,10 +113,7 @@ class DenySecretsManagerThirdPartyAccessCheck(BaseCheck[SecretsPolicyAnalysis]):
         Returns:
             Tuple of (category, result_dict) where category is a CheckCategory enum value
         """
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in result.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(result.actions_by_account)
 
         result_dict = {
             "secret_name": result.secret_name,
@@ -161,15 +158,9 @@ class DenySecretsManagerThirdPartyAccessCheck(BaseCheck[SecretsPolicyAnalysis]):
         )
         secrets_with_third_party_access = secrets_with_wildcards_and_third_party + len(check_result.compliant)
 
-        actions_by_account_serializable = {
-            account_id: sorted(list(actions))
-            for account_id, actions in self.actions_by_account.items()
-        }
+        actions_by_account_serializable = sorted_values_by_account(self.actions_by_account)
 
-        secrets_by_account_serializable = {
-            account_id: sorted(list(secrets))
-            for account_id, secrets in self.secrets_by_account.items()
-        }
+        secrets_by_account_serializable = sorted_values_by_account(self.secrets_by_account)
 
         return {
             "total_secrets_analyzed": total_secrets,
@@ -181,15 +172,6 @@ class DenySecretsManagerThirdPartyAccessCheck(BaseCheck[SecretsPolicyAnalysis]):
             "actions_by_third_party_account": actions_by_account_serializable,
             "secrets_by_third_party_account": secrets_by_account_serializable,
         }
-
-    def execute(self, session: Session) -> None:
-        """
-        Execute the check.
-
-        Args:
-            session: boto3 Session with appropriate permissions
-        """
-        super().execute(session)
 
     def _build_results_data(self, check_result: CategorizedCheckResult) -> JsonDict:
         """

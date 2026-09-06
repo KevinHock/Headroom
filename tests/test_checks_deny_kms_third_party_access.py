@@ -277,6 +277,152 @@ def run_scan(
         return results_data
 
 
+def test_the_maps_are_keyed_in_sorted_order(temp_results_dir: str) -> None:
+    """
+    A map's keys do not record which key named an account first.
+
+    The three third parties arrive 555, 333, 444, so insertion order and
+    sorted order disagree. Each expected key list is written out rather than
+    sorted, so the test and the code cannot agree by construction.
+    """
+    results_data = run_check(
+        [
+            KMSKeyPolicyAnalysis(
+                key_id="key-alpha",
+                key_arn="arn:aws:kms:us-east-1:111111111111:key/key-alpha",
+                region="us-east-1",
+                third_party_account_ids={"555555555555", "333333333333"},
+                actions_by_account={
+                    "555555555555": ["kms:Decrypt"],
+                    "333333333333": ["kms:Encrypt"],
+                },
+            ),
+            KMSKeyPolicyAnalysis(
+                key_id="key-beta",
+                key_arn="arn:aws:kms:us-east-1:111111111111:key/key-beta",
+                region="us-east-1",
+                third_party_account_ids={"444444444444"},
+                actions_by_account={"444444444444": ["kms:Decrypt"]},
+            ),
+        ],
+        temp_results_dir,
+    )
+
+    assert list(results_data["summary"]["actions_by_account"]) == [
+        "333333333333",
+        "444444444444",
+        "555555555555",
+    ]
+    assert list(results_data["keys_third_parties_can_access"][0]["actions_by_account"]) == [
+        "333333333333",
+        "555555555555",
+    ]
+
+
+def test_a_keys_grants_do_not_carry_their_arrival_order(temp_results_dir: str) -> None:
+    """
+    ListGrants pagination order does not reach the file.
+
+    A grant list sits inside an entry, so ordering the entries leaves it
+    untouched: two scans of one unchanged key would write its grants in
+    whichever order the pagination happened to yield. The two grants arrive
+    `grant-def` first, so arrival order and grant ID order disagree, and the
+    expected list is written out rather than sorted.
+    """
+    key = grant_sourced_key()
+    key.grants = [
+        KMSGrantFinding(
+            grant_id="grant-def",
+            grantee_account_id=THIRD_PARTY,
+            grantee_principal=THIRD_PARTY_ROLE_ARN,
+            grantee_account_id_source="arn",
+            retiring_principal_account_id=None,
+            operations=["kms:Encrypt"],
+            has_constraints=False,
+        ),
+        KMSGrantFinding(
+            grant_id="grant-abc",
+            grantee_account_id=THIRD_PARTY,
+            grantee_principal=THIRD_PARTY_ROLE_ARN,
+            grantee_account_id_source="arn",
+            retiring_principal_account_id=None,
+            operations=["kms:Decrypt"],
+            has_constraints=False,
+        ),
+    ]
+
+    results_data = run_check([key], temp_results_dir)
+
+    assert results_data["keys_third_parties_can_access"][0]["grants"] == [
+        {
+            "grant_id": "grant-abc",
+            "grantee_account_id": THIRD_PARTY,
+            "grantee_principal": THIRD_PARTY_ROLE_ARN,
+            "grantee_account_id_source": "arn",
+            "retiring_principal_account_id": None,
+            "operations": ["kms:Decrypt"],
+            "has_constraints": False,
+        },
+        {
+            "grant_id": "grant-def",
+            "grantee_account_id": THIRD_PARTY,
+            "grantee_principal": THIRD_PARTY_ROLE_ARN,
+            "grantee_account_id_source": "arn",
+            "retiring_principal_account_id": None,
+            "operations": ["kms:Encrypt"],
+            "has_constraints": False,
+        },
+    ]
+
+
+def test_a_keys_unresolved_grants_do_not_carry_their_arrival_order(
+    temp_results_dir: str,
+) -> None:
+    """
+    The second nested list is ordered by the same rule as the first.
+
+    An unresolved grant is a different shape reached by a different
+    comprehension, so it needs its own pinning. The two arrive `grant-def`
+    first, and the expected list is written out rather than sorted.
+    """
+    key = unresolved_key()
+    key.unresolved_grants = [
+        UnresolvedKMSGrantFinding(
+            grant_id="grant-def",
+            grantee_principal=UNRESOLVABLE_ROLE_UNIQUE_ID,
+            principal_kind="iam_role_unique_id",
+            operations=["kms:Encrypt"],
+            has_constraints=False,
+        ),
+        UnresolvedKMSGrantFinding(
+            grant_id="grant-abc",
+            grantee_principal=UNRESOLVABLE_ROLE_UNIQUE_ID,
+            principal_kind="iam_role_unique_id",
+            operations=["kms:Decrypt"],
+            has_constraints=False,
+        ),
+    ]
+
+    results_data = run_check([key], temp_results_dir)
+
+    assert results_data["keys_with_wildcards"][0]["unresolved_grants"] == [
+        {
+            "grant_id": "grant-abc",
+            "grantee_principal": UNRESOLVABLE_ROLE_UNIQUE_ID,
+            "principal_kind": "iam_role_unique_id",
+            "operations": ["kms:Decrypt"],
+            "has_constraints": False,
+        },
+        {
+            "grant_id": "grant-def",
+            "grantee_principal": UNRESOLVABLE_ROLE_UNIQUE_ID,
+            "principal_kind": "iam_role_unique_id",
+            "operations": ["kms:Encrypt"],
+            "has_constraints": False,
+        },
+    ]
+
+
 class TestCheckDenyKMSThirdPartyAccess:
     """Test deny_kms_third_party_access check with various scenarios."""
 

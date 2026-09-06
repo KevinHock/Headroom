@@ -573,6 +573,72 @@ class TestCheckDenyECRThirdPartyAccess:
             assert isinstance(actions, list)
             assert actions == sorted(actions)
 
+    def test_the_maps_are_keyed_in_sorted_order(
+        self,
+        temp_results_dir: str,
+        org_account_ids: set[str],
+    ) -> None:
+        """
+        A map's keys do not record which repository named an account first.
+
+        The three third parties arrive 555, 333, 444, so insertion order and
+        sorted order disagree. Each expected key list is written out rather
+        than sorted, so the test and the code cannot agree by construction.
+        """
+        mock_session = MagicMock()
+        analyses = [
+            ECRPolicyAnalysis(
+                scope="repository",
+                repository_name="alpha-repo",
+                repository_arn="arn:aws:ecr:us-east-1:111111111111:repository/alpha-repo",
+                region="us-east-1",
+                third_party_account_ids={"555555555555", "333333333333"},
+                actions_by_account={
+                    "555555555555": ["ecr:BatchGetImage"],
+                    "333333333333": ["ecr:GetDownloadUrlForLayer"],
+                },
+                has_wildcard_principal=False,
+            ),
+            ECRPolicyAnalysis(
+                scope="repository",
+                repository_name="beta-repo",
+                repository_arn="arn:aws:ecr:us-east-1:111111111111:repository/beta-repo",
+                region="us-east-1",
+                third_party_account_ids={"444444444444"},
+                actions_by_account={"444444444444": ["ecr:BatchGetImage"]},
+                has_wildcard_principal=False,
+            ),
+        ]
+
+        with (
+            patch("headroom.checks.rcps.deny_ecr_third_party_access.analyze_ecr_policies") as mock_analysis,
+            patch("headroom.checks.base.write_check_results") as mock_write,
+            patch("builtins.print"),
+        ):
+            mock_analysis.return_value = analyses
+
+            check = DenyECRThirdPartyAccessCheck(
+                check_name=DENY_ECR_THIRD_PARTY_ACCESS,
+                account_name="test-account",
+                account_id="111111111111",
+                results_dir=temp_results_dir,
+                org_account_ids=org_account_ids,
+                org_id=ORG_ID,
+            )
+            check.execute(mock_session)
+
+            results_data = mock_write.call_args[1]["results_data"]
+
+            assert list(results_data["summary"]["actions_by_account"]) == [
+                "333333333333",
+                "444444444444",
+                "555555555555",
+            ]
+            assert list(results_data["policies_third_parties_can_access"][0]["actions_by_account"]) == [
+                "333333333333",
+                "555555555555",
+            ]
+
 
 class TestRegistryScopedResults:
     """

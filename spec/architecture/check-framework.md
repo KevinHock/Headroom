@@ -94,11 +94,18 @@ The template method, in order:
 
 1. `analyze(session)` — one list of raw results.
 2. `categorize_result` for each, sorted into violations, exemptions, compliant.
-3. A summary of `account_name`, `account_id`, `check`, plus
+3. Each of those three lists ordered by `entry_sort_key`, which reads an
+   entry's fields in the order `categorize_result` wrote them. This precedes
+   the summary deliberately: `deny_iam_saml_provider_not_aws_sso` derives
+   `violating_provider_arns` from the violations list positionally, and
+   `deny_iam_user_creation` derives `users` from the compliant list the same
+   way, so both inherit the order rather than needing their own sort.
+   [`../contracts/results.md`](../contracts/results.md) owns the rule.
+4. A summary of `account_name`, `account_id`, `check`, plus
    `build_summary_fields`.
-4. `write_check_results(...)` — the single call site for the result writer.
+5. `write_check_results(...)` — the single call site for the result writer.
    Schema: [`../contracts/results.md`](../contracts/results.md).
-5. A completion line naming the three counts.
+6. A completion line naming the three counts.
 
 A check does not choose its filename, its directory, or its redaction. Those are
 the framework's, so they stay uniform across every check.
