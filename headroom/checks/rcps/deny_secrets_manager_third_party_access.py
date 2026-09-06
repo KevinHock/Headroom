@@ -173,15 +173,6 @@ class DenySecretsManagerThirdPartyAccessCheck(BaseCheck[SecretsPolicyAnalysis]):
             "secrets_by_third_party_account": secrets_by_account_serializable,
         }
 
-    def execute(self, session: Session) -> None:
-        """
-        Execute the check.
-
-        Args:
-            session: boto3 Session with appropriate permissions
-        """
-        super().execute(session)
-
     def _build_results_data(self, check_result: CategorizedCheckResult) -> JsonDict:
         """
         Build results data in the format expected by this check.

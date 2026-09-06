@@ -167,15 +167,6 @@ class DenySQSThirdPartyAccessCheck(BaseCheck[SQSQueuePolicyAnalysis]):
             "queues_by_third_party_account": queues_by_account_serializable,
         }
 
-    def execute(self, session: Session) -> None:
-        """
-        Execute the check.
-
-        Args:
-            session: boto3 Session with appropriate permissions
-        """
-        super().execute(session)
-
     def _build_results_data(self, check_result: CategorizedCheckResult) -> JsonDict:
         """
         Build results data in the format expected by this check.

@@ -166,15 +166,6 @@ class DenyS3ThirdPartyAccessCheck(BaseCheck[S3BucketPolicyAnalysis]):
             "buckets_by_third_party_account": buckets_by_account_serializable,
         }
 
-    def execute(self, session: Session) -> None:
-        """
-        Execute the check.
-
-        Args:
-            session: boto3 Session with appropriate permissions
-        """
-        super().execute(session)
-
     def _build_results_data(self, check_result: CategorizedCheckResult) -> Dict[str, Any]:
         """
         Build results data in the format expected by this check.
