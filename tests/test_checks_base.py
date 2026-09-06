@@ -222,6 +222,21 @@ class VaryingFieldStubCheck(OrderedStubCheck):
         return CheckCategory.COMPLIANT, entry
 
 
+class SetFieldStubCheck(OrderedStubCheck):
+    """
+    A check that puts a `set` in an entry, which no check may do.
+
+    A set has no JSON form, and its iteration order differs between
+    processes under hash randomization, so a sort key or a file derived
+    from its `repr` would differ between two runs over the same resources.
+    """
+
+    def categorize_result(self, result: str) -> tuple[CheckCategory, JsonDict]:
+        """Report every resource as compliant, with its regions as a set."""
+        region, image_id = result.split("|")
+        return CheckCategory.COMPLIANT, {"image_id": image_id, "regions": {region}}
+
+
 class TestEvidenceOrdering:
     """The order `execute` writes violations, exemptions, and compliant in."""
 
@@ -276,6 +291,30 @@ class TestEvidenceOrdering:
         second = write_results_for(OrderedStubCheck(list(reversed(entries)), **arguments))
 
         assert first == second
+
+    def test_a_field_holding_a_set_raises_rather_than_sorting_by_its_repr(self) -> None:
+        """
+        A value JSON cannot serialize fails the scan instead of ordering by its `repr`.
+
+        `entry_sort_key` serializes each field to compare it, and passes no
+        `default`: a set's `repr` lists its members in hash order, which
+        changes between processes, so a key built from it would put the same
+        two entries in a different order on the next run. Raising here is
+        what keeps the "two runs write the same bytes" property provable.
+        """
+        check = SetFieldStubCheck(
+            [
+                "us-east-1|ami-22222222222222222",
+                "us-west-2|ami-11111111111111111",
+            ],
+            check_name="deny_ec2_ami_owner",
+            account_name="security-tooling",
+            account_id="111111111111",
+            results_dir="/unused",
+        )
+
+        with pytest.raises(TypeError, match="not JSON serializable"):
+            write_results_for(check)
 
     def test_a_field_that_is_none_on_one_entry_still_sorts(self) -> None:
         """

@@ -437,7 +437,13 @@ traceback, with no log line at all: `MalformedPolicyError`,
 `UnknownPrincipalTypeError`, `UnknownGranteeTypeError`,
 `UnknownGrantPrincipalError`, `InvalidFederatedPrincipalError`, and
 `MalformedStatementError` each subclass `Exception` directly, an `Action`
-that is neither a string nor an array raises `TypeError`, and a KMS grant
+that is neither a string nor an array raises `TypeError`, a result value with
+no JSON form — a `set`, a `datetime` — raises `TypeError` from
+`entry_sort_key` when it sits in an evidence entry and from
+`write_check_results` when it sits in `summary`, since neither passes a
+`default` to the encoder
+([`../contracts/results.md`](../contracts/results.md#ordering-and-stability)
+owns why), and a KMS grant
 carrying no `GrantId`, or neither `GranteeServicePrincipal` nor
 `GranteePrincipal` while carrying any operation other than `RetireGrant`
 alone, raises `KeyError`. A grant carrying only `RetireGrant` is skipped
@@ -457,9 +463,12 @@ unique ID in the documented shape: a value the two patterns match is attributed
 or recorded rather than raised on, whether or not an account comes out of it.
 Both are for reasons
 [`../checks/rcps/deny_kms_third_party_access.md`](../checks/rcps/deny_kms_third_party_access.md)
-owns. The bare `TypeError` names only the value's Python type, and the
-`KeyError` only the absent field. None of the eight lets the run finish and
-report the account clean, which is the property that matters.
+owns. Each bare `TypeError` names only the value's Python type, and the
+`KeyError` only the absent field. None of the nine lets the run finish and
+report the account clean, which is the property that matters. The encoder's
+`TypeError` is also the one of the nine that a partial file could have
+survived: the writer serializes before it opens the file, so the abort leaves
+no result behind for a later run's `results_exist` to take as finished.
 
 `UnknownPrincipalTypeError` was for a time the one type on that list with a
 catch site: `headroom/aws/sqs.py` caught it and recorded the queue as a read

@@ -53,8 +53,11 @@ def entry_sort_key(entry: Mapping[str, object]) -> List[str]:
     that are each `None` on some findings and a `str` on others -- has no
     comparison to lose. Two entries of unequal length compare on the fields
     they share and then on length, which the same serialization gives for
-    free. `default=str` matches what the writer already passes to
-    `json.dump`.
+    free. No `default` is passed: a value JSON cannot encode raises here,
+    before the writer sees it, because a `set` serialized as its `repr`
+    lists its members in hash order and would sort the same two entries
+    differently on the next run. The writer refuses such a value for the
+    same reason.
 
     A list of records nested inside an entry is ordered by this same rule,
     which is why the function is public: sorting the entries leaves such a
@@ -70,7 +73,7 @@ def entry_sort_key(entry: Mapping[str, object]) -> List[str]:
     Returns:
         The record's values serialized, in authored order
     """
-    return [json.dumps(value, sort_keys=True, default=str) for value in entry.values()]
+    return [json.dumps(value, sort_keys=True) for value in entry.values()]
 
 
 def sorted_values_by_account(values_by_account: Mapping[str, Union[AbstractSet[str], List[str]]]) -> Dict[str, List[str]]:

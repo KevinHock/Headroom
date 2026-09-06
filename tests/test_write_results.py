@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from headroom.types import JsonDict
 from headroom.write_results import (
     write_check_results,
     get_results_dir,
@@ -271,6 +272,37 @@ class TestWriteCheckResults:
 
             expected_path = Path(temp_dir) / "scps" / check_name / f"{account_name}_{account_id}.json"
             assert expected_path.exists()
+
+    def test_write_check_results_raises_on_a_value_json_cannot_serialize_and_writes_nothing(self) -> None:
+        """
+        A `set` in the results raises `TypeError`, and no file is left behind.
+
+        The writer passes no `default` to the encoder: a set written as its
+        `repr` would list its members in hash order, which differs between
+        processes, so two scans of one unchanged account would write
+        different bytes. And it serializes to a string before opening the
+        file, so the failure leaves nothing on disk - a partial file would
+        make the next run's `results_exist` skip the account as done.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            results_data: JsonDict = {
+                "summary": {"account_name": "test-account", "regions": {"us-east-1"}},
+                "violations": [],
+                "exemptions": [],
+                "compliant_instances": [],
+            }
+
+            with pytest.raises(TypeError, match="not JSON serializable"):
+                write_check_results(
+                    check_name="deny_ec2_imds_v1",
+                    check_type="scps",
+                    account_name="test-account",
+                    account_id="111111111111",
+                    results_data=results_data,
+                    results_base_dir=temp_dir,
+                )
+
+            assert list(Path(temp_dir).rglob("*.json")) == []
 
     def test_write_check_results_raises_on_io_error(self) -> None:
         """Test that IOError is raised when file writing fails."""

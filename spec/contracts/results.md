@@ -353,7 +353,15 @@ account.
 
 Result files are written with `indent=2` and a trailing newline so they can be
 committed and diffed. Two runs against unchanged infrastructure produce
-files that differ in `summary.scanned_at` and nowhere else.
+files that differ in `summary.scanned_at` and nowhere else. The encoder is
+given no `default`, so a value with no JSON form — a `set`, a `datetime` —
+raises `TypeError` rather than being written as its `repr`: a set's `repr`
+lists its members in hash order, which differs between processes, and would
+break that property silently. `entry_sort_key` refuses the same values, so the
+failure surfaces at the sort for an evidence entry and at the write for a
+`summary` field, and the writer serializes the whole document before it opens
+the file, so neither leaves a partial file that a later run's `results_exist`
+would take for a finished account.
 
 **An evidence entry sorts by its fields in authored order.** Every entry in one
 list comes from a single dict literal in that check's `categorize_result`, so

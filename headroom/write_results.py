@@ -233,8 +233,14 @@ def write_check_results(
             data_to_write["summary"] = data_to_write["summary"].copy()
             data_to_write["summary"].pop("account_id", None)
 
+    # Serialized before the file is opened, and with no `default`: a value
+    # JSON cannot encode raises TypeError here, leaving nothing on disk that
+    # a later run's `results_exist` would take for a finished account. A set
+    # written as its repr would list its members in hash order, so the same
+    # account would write different bytes on the next scan.
+    serialized = json.dumps(data_to_write, indent=2)
     with open(output_file, 'w') as f:
-        json.dump(data_to_write, f, indent=2, default=str)
+        f.write(serialized)
         f.write('\n')
     logger.info(f"Wrote results to {output_file}")
 
