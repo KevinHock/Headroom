@@ -7,7 +7,7 @@ violate each guardrail, and writes Terraform only for the Service Control
 Policies (SCPs) and Resource Control Policies (RCPs) every reached account
 already satisfies, attached at the highest level of the org where that is true.
 
-> **Status:** proof of concept. Review every generated policy before you apply it.
+> **Disclosure:** I am not liable for your outage. Review every generated policy before you apply it.
 
 [![Python Version](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -61,15 +61,13 @@ OU that is clean instead, and to nothing that is not.*
   the run. Absence of evidence is never reported as zero findings.
 
 The first three are the [safety promise](spec/product.md#the-safety-promise)
-in brief and the last two are [global invariants](spec/invariants.md). Those
-documents are the authority; this page is not.
+in brief and the last two are [global invariants](spec/invariants.md).
 
 ## Why
 
 AWS lets you write a guardrail as a Service Control Policy or a Resource
 Control Policy, but it cannot tell you what attaching one would break. The only
-way to find out is to attach it, so organizations past a handful of accounts
-accumulate guardrails they believe in and never deploy. Headroom answers the
+way to find out is to attach it. Headroom answers the
 question per check: which accounts already comply, where the policy can attach
 today, and exactly which resources stand in the way of the rest. The product
 specification states [the safety promise](spec/product.md#the-safety-promise)
